@@ -2,7 +2,7 @@ from numpy import byte
 from ftp import ServerFTP
 
 IP = '127.0.0.1'
-PORT = 2331
+PORT = 2222
 
 server = ServerFTP(IP, PORT)
 
@@ -100,7 +100,7 @@ while True:
     elif "STAT" in cmd:
         server.stat_command()
     elif "HELP" in cmd:
-        server.help_command()
+        server.help_command(data)
 
     #Miscellaneous commands
     elif "SITE" in cmd:

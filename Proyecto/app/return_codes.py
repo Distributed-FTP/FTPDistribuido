@@ -17,8 +17,8 @@ class Return_Codes():
     def Code_202():
         return '202 Orden no implementada, no necesaria en este sistema.\r\n'
     
-    def Code_211():
-        return '211 Estado del sistema o respuesta de ayuda del sistema.\r\n'
+    def Code_211(data):
+        return f'211 {data}\r\n'
 
     def Code_212():
         return '212 Estado del directorio.\r\n'
@@ -26,8 +26,8 @@ class Return_Codes():
     def Code_213():
         return '213 Estado del fichero.\r\n'
 
-    def Code_214():
-        return '214 Mensaje de ayuda.\r\n'
+    def Code_214(data):
+        return f'214 {data}\r\n'
          
     def Code_215(data):
         return f'215 {str(data)} system type.\r\n'
