@@ -3,7 +3,6 @@ from ftp import ServerFTP
 
 IP = '127.0.0.1'
 PORT = 2331
-PASIVE = False
 
 server = ServerFTP(IP, PORT)
 
@@ -16,17 +15,10 @@ server.accept()
 server.welcome_message()
 
 while True:
-    if PASIVE:
-        server.accept()
-        server.welcome_message()
-        
-    
     print("Waiting instructions \n")
 
     data = server.receive()
-    
     data = data.decode('utf-8',errors='ignore')
-    if not data: break
 
     data = str(data).replace("b'", '')
     data = data.replace("\\r\\n", '')
@@ -61,11 +53,10 @@ while True:
     #Transfer parameters
     elif "PORT" in cmd:
         server.port_command(data)
-        PASIVE = True
     elif "PASV" in cmd:
         server.pasv_command()
     elif "MODE" in cmd:
-        server.mode_command()
+        server.mode_command(data)
     elif "TYPE" in cmd:
         server.type_command(data)
     elif "STRU" in cmd:
@@ -101,7 +92,7 @@ while True:
     elif "PWD" in cmd:
         server.pwd_command(data)
     elif "ABOR" in cmd:
-        server.abor_command(data)
+        server.abor_command()
 
     #Informational commands
     elif "SYST" in cmd:

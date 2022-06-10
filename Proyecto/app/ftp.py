@@ -1,9 +1,11 @@
 from http.client import PRECONDITION_REQUIRED
+from nturl2path import pathname2url
 import socket
 import os
 import time
 import sys
 import tqdm
+from return_codes import Return_Codes
 
 class ServerFTP():
     def __init__(self, ip, port, buffer=1024):
@@ -19,7 +21,9 @@ class ServerFTP():
         self.data_address = None
         self.datasock = None
 
-        self.mode = 'I'
+        self.mode = 'S'
+        self.type = 'A N'
+        self.stru = 'F'
         self.is_anonymous = False
         self.path = os.getcwd() + "/root/"
         self.__fd_rename = None
@@ -41,8 +45,7 @@ class ServerFTP():
         return res
 
     def welcome_message(self):
-        send = '220 connection started.\r\n'
-        self.conn.send(send.encode())
+        self.conn.send(Return_Codes.Code_220().encode())
 
 
     '''
@@ -55,14 +58,16 @@ class ServerFTP():
         u = data.split(" ")[1]
         if u == "anonymous\r\n" or u == "anonymous":
             self.is_anonymous = True
-        self.conn.send(('331 OK - {}.\r\n'.format(u)).encode())
+        self.conn.send(Return_Codes.Code_331(u).encode())
 
     def pass_command(self, data):
         # p = data.split(" ")[1] #password 
-        self.conn.send('230 OK.\r\n'.encode())
+        #self.conn.send(Return_Codes.Code_332().encode())
+        #self.conn.send(Return_Codes.Code_500().encode())
+        self.conn.send(Return_Codes.Code_230().encode())
 
-    def acct_command(self):
-        self.conn.send('230 OK.\r\n'.encode())
+    def acct_command(self, data):
+        None
 
     def cwd_command(self, data):
         list = data.split(" ")
@@ -71,23 +76,23 @@ class ServerFTP():
         for path in list:
             if path != "CWD":
                 pathname += path
-                length += 1
             if len(list) > 2 and length + 1 < len(list) and length != 0:
                 pathname += " "
+            length+=1
         try:
             if pathname.__contains__("/"):
                 self.path = pathname + "/"
             else:
-                self.path = self.path + "/" + pathname + "/"
+                self.path = self.path + pathname + "/"
             os.chdir(self.path)
             
             print("The current directory is", os.getcwd()) 
-            self.conn.send(('200 \"%s\" is current directory.\r\n' % os.getcwd()).encode() )
+            self.conn.send(Return_Codes.Code_200().encode())
 
         # Caching the exception     
         except: 
             print("Something wrong with specified directory. Exception- ", sys.exc_info())
-            self.conn.send(('550 \"{}\" Requested action not taken. File unavailable.\r\n'.format(os.getcwd()+"\\"+str(pathname))).encode() )
+            self.conn.send(Return_Codes.Code_550().encode())
 
     def cdup_command(self, data):
         paths = self.path.split('/')
@@ -108,25 +113,40 @@ class ServerFTP():
             self.path = pathname + "/"
             os.chdir(pathname + "/")
             print("The current directory is", os.getcwd()) 
-            self.conn.send(('200 \"%s\" is current directory.\r\n' % os.getcwd()).encode() )
+            self.conn.send(Return_Codes.Code_200().encode() )
 
         # Caching the exception     
         except: 
             print("Something wrong with specified directory. Exception- ", sys.exc_info())
-            self.conn.send(('550 \"{}\" Requested action not taken. File unavailable.\r\n'.format(os.getcwd()+"/"+str(pathname))).encode() )
+            self.conn.send(Return_Codes.Code_550().encode())
 
     def smnt_command(self):
-        self.conn.send('230 OK.\r\n'.encode())
+        None
 
 
     '''
         Logout
     '''
-    def rein_command(self):
-        self.conn.send('230 OK.\r\n'.encode())
+    def rein_command(self, data):
+        self.data_address = None
+        self.datasock = None
 
+        self.mode = 'S'
+        self.type = 'A N'
+        self.stru = 'F'
+        self.is_anonymous = False
+        self.path = os.getcwd() + "/root/"
+        self.__fd_rename = None
+        
+        try:
+            time_stop = int(data.split(' ')[1])
+            self.conn.send(Return_Codes.Code_120().encode() )
+            time.sleep(time_stop * 60)
+        except:
+            self.conn.send(Return_Codes.Code_220().encode() )
+        
     def quit_command(self):
-        self.conn.send('221 Goodbye.\r\n'.encode())
+        self.conn.send(Return_Codes.Code_221().encode())
         self.__close()
 
 
@@ -141,33 +161,60 @@ class ServerFTP():
         port = cmd_ip_port[-2:]
         port =  int(port[0])*256 + int(port[1])
         self.data_address = (ip, port)
-        send = '200 Port command successfull.\r\n'
-        self.conn.send(send.encode())
+        self.conn.send(Return_Codes.Code_200().encode())
 
     def pasv_command(self):     
-        send = '227 passive mode activated. \r\n'
-        self.conn.send(send.encode())
+        self.conn.send(Return_Codes.Code_227().encode())
 
-    def mode_command(self):
-        self.conn.send('230 OK.\r\n'.encode())
+    def mode_command(self, data):
+        mode = data.split(" ")[1]
+        if mode != 'S' and mode != 'B' and mode != 'C':
+            self.conn.send(Return_Codes.Code_501().encode())
+            return
+        self.mode = mode
+        self.conn.send(Return_Codes.Code_200().encode())
 
     def type_command(self,data):
-        self.mode = data.split(" ")
-        send = '200 funcioned.\r\n'
-        self.conn.send(send.encode())
+        type_list = data.split(' ')
+        
+        if len(type_list) == 2:
+            type = type_list[1]
+        else:
+            type = type_list[1] + " " + type_list[2]
 
-    def stru_command(self):
-        self.conn.send('230 OK.\r\n'.encode())
+        if type_list[1] != "I" and type_list[1] != "L" and type_list[1] != "A" and type_list[1] != "E":
+            self.conn.send(Return_Codes.Code_501().encode())
+            return
+        elif len(type_list) == 2 and type_list[1] != "I":
+            self.conn.send(Return_Codes.Code_501().encode())
+            return
+        elif len(type_list) == 3:
+            if type_list[1] == "L" and type_list[2] != 123:
+                self.conn.send(Return_Codes.Code_501().encode())
+                return
+            elif type_list[1] == "A" or type_list[1] == "E" and type_list[2] != "N" and type_list[2] != "T" and type_list[2] != "C":
+                self.conn.send(Return_Codes.Code_501().encode())
+                return
+        self.type = type
+        self.conn.send(Return_Codes.Code_200().encode())
+
+    def stru_command(self, data):
+        stru = data.split(" ")[1]
+        if stru != 'F' and stru != 'R' and stru != 'P':
+            self.conn.send(Return_Codes.Code_501().encode())
+            return
+        self.stru = stru
+        self.conn.send(Return_Codes.Code_200().encode())
 
 
     '''
         File action commands
     '''
     def allo_command(self, data):
-        self.conn.send('230 OK.\r\n'.encode())
+        self.conn.send(Return_Codes.Code_200().encode())
 
     def rest_command(self, data):
-        self.conn.send('230 OK.\r\n'.encode())
+        None
 
     def stor_command(self, data):
         # str_size = struct.unpack("i", self.conn.recv(4))[0]
@@ -177,7 +224,7 @@ class ServerFTP():
         
         print('Upload file... ',filename)
 
-        self.conn.send('150 Opening data connection.\r\n'.encode())
+        self.conn.send(Return_Codes.Code_150().encode())
         self.datasock = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
         self.datasock.connect(self.data_address)
 
@@ -192,15 +239,15 @@ class ServerFTP():
                     if not bytes_recieved: break
 
                     f.write(bytes_recieved)
-
-            self.conn.send('226 Transfer complete.\r\n'.encode())        
+            
+            self.conn.send(Return_Codes.Code_226().encode())
         except:
-            self.conn.send("550 can't access file .\r\n".encode())
+            self.conn.send(Return_Codes.Code_550().encode())
         self.datasock.close()
         print('Upload Successful\n')
 
     def stou_command(self, data):
-        self.conn.send('230 OK.\r\n'.encode())
+        None
 
     def retr_command(self,data):
         filename = data.split(" ")[1]
@@ -210,17 +257,15 @@ class ServerFTP():
         try:
             filesize = os.path.getsize(filename)
         except: 
-            self.conn.send(("550 can't access file '{}'.\r\n").format(filename).encode())
+            self.conn.send(Return_Codes.Code_550().encode())
             return
 
         progress = tqdm.tqdm(range(
             filesize), "Sending {filename}", unit="B", unit_scale=True, unit_divisor=1024)
 
-        self.conn.send('150 Opening data connection.\r\n'.encode())
+        self.conn.send(Return_Codes.Code_150().encode())
         self.socket.socket(socket.AF_INET,socket.SOCK_STREAM)
         self.datasock.connect(self.data_address)
-        
-        print("paso")
 
         readmode = 'rb' if  self.mode == 'I' else 'r'
 
@@ -237,15 +282,14 @@ class ServerFTP():
                     # self.conn.sendall(bytes_read)
                     self.datasock.send(bytes_read)
                     progress.update(len(bytes_read))
-
+            self.conn.send(Return_Codes.Code_226().encode())
                 
         except:
-            self.conn.send("550 can't access file: Permission denied.\r\n".encode())
+            self.conn.send(Return_Codes.Code_550().encode())
         self.datasock.close()
-        self.conn.send('226 Transfer complete.\r\n'.encode())
-
+        
     def list_command(self):
-        self.conn.send('150 Here comes the directory listing.\r\n'.encode())
+        self.conn.send(Return_Codes.Code_150().encode())
         self.datasock = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
         self.datasock.connect(self.data_address)
 
@@ -258,17 +302,16 @@ class ServerFTP():
         for t in l:
             if self.__has_access(t):
                 k = self.__to_list_item(t, self.path)
-                #self.conn.send('125 Ready open.\r\n'.encode())
                 self.datasock.send(k.encode())
             
         self.datasock.close()
-        self.conn.send('226 Directory send OK.\r\n'.encode())
+        self.conn.send(Return_Codes.Code_226().encode())
 
     def nlst_command(self):
-        self.conn.send('230 OK.\r\n'.encode())
+        None
 
     def appe_command(self, data):
-        self.conn.send('230 OK.\r\n'.encode())
+        None
 
     def rnfr_command(self, data):
         path_name = str(data).split(" ")
@@ -281,8 +324,9 @@ class ServerFTP():
                 pathname = pathname + path + " "
             else:
                 pathname = pathname + path
+            i+=1
         self.__fd_rename = pathname
-        self.conn.send('230 OK.\r\n'.encode())
+        self.conn.send(Return_Codes.Code_350().encode())
 
     def rnto_command(self, data):
         path_name = str(data).split(" ")
@@ -295,17 +339,17 @@ class ServerFTP():
                 pathname = pathname + path + " "
             else:
                 pathname = pathname + path
+            i+=1
         try:
             os.rename(self.__fd_rename, pathname)
             self.__fd_rename = None
             print("The current directory is", os.getcwd()) 
-            self.conn.send('230 OK.\r\n'.encode())
+            self.conn.send(Return_Codes.Code_250().encode())
 
         # Caching the exception     
         except: 
             print("Something wrong with specified directory. Exception- ", sys.exc_info())
-            self.conn.send(('550 \"{}\" Requested action not taken. File unavailable.\r\n'.format(str(pathname))).encode() )
-        self.conn.send('230 OK.\r\n'.encode())
+            self.conn.send(Return_Codes.Code_550().encode())
 
     def dele_command(self, data):
         path_name = str(data).split(" ")
@@ -318,16 +362,21 @@ class ServerFTP():
                 pathname = pathname + path + " "
             else:
                 pathname = pathname + path
-        print(pathname)
+            i+=1
         try: 
             os.rmdir(pathname)
             print("The current directory is", os.getcwd()) 
-            self.conn.send('230 OK.\r\n'.encode())
+            self.conn.send(Return_Codes.Code_250().encode())
 
         # Caching the exception     
         except: 
-            print("Something wrong with specified directory. Exception- ", sys.exc_info())
-            self.conn.send(('550 \"{}\" Requested action not taken. File unavailable.\r\n'.format(str(pathname))).encode() )
+            try: 
+                os.remove(pathname)
+                print("The current directory is", os.getcwd()) 
+                self.conn.send(Return_Codes.Code_250().encode())
+            except:
+                print("Something wrong with specified directory. Exception- ", sys.exc_info())
+                self.conn.send(Return_Codes.Code_550().encode())
 
     def rmd_command(self, data):
         path_name = str(data).split(" ")
@@ -340,16 +389,17 @@ class ServerFTP():
                 pathname = pathname + path + " "
             else:
                 pathname = pathname + path
+            i+=1
         
         try: 
             os.rmdir(pathname)
             print("The current directory is", os.getcwd()) 
-            self.conn.send('230 OK.\r\n'.encode())
+            self.conn.send(Return_Codes.Code_250().encode())
 
         # Caching the exception     
         except: 
             print("Something wrong with specified directory. Exception- ", sys.exc_info())
-            self.conn.send(('550 \"{}\" Requested action not taken. File unavailable.\r\n'.format(str(pathname))).encode() )
+            self.conn.send(Return_Codes.Code_550().encode())
 
     def mkd_command(self, data):
         path_name = str(data).split(" ")
@@ -362,51 +412,54 @@ class ServerFTP():
                 pathname = pathname + path + " "
             else:
                 pathname = pathname + path
-        
-        try: 
+            i+=1
+
+        try:
             os.mkdir(pathname)
             print("The current directory is", os.getcwd()) 
-            self.conn.send('257 \"{}\" directory created.\r\n'.format(pathname).encode())
+            self.conn.send(Return_Codes.Code_257(pathname).encode())
 
         # Caching the exception     
         except: 
             print("Something wrong with specified directory. Exception- ", sys.exc_info())
-            self.conn.send(('550 \"{}\" Requested action not taken. File unavailable.\r\n'.format(str(pathname))).encode() )
+            self.conn.send(Return_Codes.Code_550().encode())
 
     def pwd_command(self, data):
-        self.conn.send(('257 \"%s\" is current directory.\r\n' % self.path).encode() )
-        
-        print("Successfully sent file listing \n")
+        self.conn.send(Return_Codes.Code_257(self.path).encode())
 
-    def abor_command(self, data):
-        send = '225 abor command.\r\n'
-        self.conn.send(send.encode())
+    def abor_command(self):
+        try:
+            self.datasock.close()
+            self.conn.send(Return_Codes.Code_226(self.path).encode())
+        except:
+            self.conn.send(Return_Codes.Code_426(self.path).encode())
+            self.conn.send(Return_Codes.Code_226(self.path).encode())
 
 
     '''
         Informational commands
     '''
     def syst_command(self):
-        self.conn.send('230 OK.\r\n'.encode())
+        self.conn.send(Return_Codes.Code_215("ST").encode())
 
     def stat_command(self):
-        self.conn.send('230 OK.\r\n'.encode())
+        None
 
     def help_command(self):
-        self.conn.send('230 OK.\r\n'.encode())
+        None
 
 
     '''
         Miscellaneous commands
     '''
     def site_command(self):
-        self.conn.send('230 OK.\r\n'.encode())
+        None
 
     def noop_command(self):
-        self.conn.send('230 OK.\r\n'.encode())
+        self.conn.send(Return_Codes.Code_200().encode())
 
     def command_not_found(self):
-        self.conn.send('500 Command Not Found.\r\n'.encode())
+        self.conn.send(Return_Codes.Code_500().encode())
 
 
     '''
