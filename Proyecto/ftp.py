@@ -72,7 +72,7 @@ class ServerFTP(Thread):
             elif "CWD" in cmd:
                 self.cwd_command(data)
             elif "CDUP" in cmd:
-                self.cdup_command(data)
+                self.cdup_command()
             elif "SMNT" in cmd:
                 self.smnt_command()
             
@@ -182,6 +182,8 @@ class ServerFTP(Thread):
         self.control_connection.close()
 
     def __has_access(self, file : str):
+        if not self.is_anonymous and file.find("anonymous") != 0:
+            return True
         if self.is_anonymous and file.find("anonymous") != 0:
             return True
         return False
@@ -250,22 +252,30 @@ class ServerFTP(Thread):
                 pathname += str(names[i])
             else:
                 pathname += str(names[i]) + " "
-        try:
+        try:     
             if pathname.__contains__("/"):
-                self.path = pathname + "/"
+                pathname = pathname + "/"
             else:
-                self.path = self.path + pathname + "/"
-            os.chdir(self.path)
+                pathname = self.path + pathname + "/"
+            if not self.is_anonymous and pathname.find("root") != -1:
+                os.chdir(pathname)
+                self.path = pathname
+            elif self.is_anonymous and pathname.find("anonymous") != -1:
+                os.chdir(pathname)
+                self.path = pathname
+            else:
+                self.__send_control(Return_Codes.Code_550().encode())
+                return
             
             print("The current directory is", os.getcwd()) 
-            self.__send_control(Return_Codes.Code_200().encode())
+            self.__send_control(Return_Codes.Code_250().encode())
 
         # Caching the exception     
         except OSError as error: 
             print(f"Something wrong with specified directory. Exception- {error}")
             self.__send_control(Return_Codes.Code_550().encode())
 
-    def cdup_command(self, data):
+    def cdup_command(self):
         paths = self.path.split('/')
         i = len(paths) - 1
         continue_delete = True
@@ -282,11 +292,11 @@ class ServerFTP(Thread):
                 pathname = pathname + p + "/"   
         try: 
             if not self.is_anonymous and pathname.find("root") != -1:
-                self.path = pathname + "/"
                 os.chdir(pathname + "/")
+                self.path = pathname + "/"
             elif self.is_anonymous and pathname.find("anonymous") != -1:
-                self.path = pathname + "/"
                 os.chdir(pathname + "/")
+                self.path = pathname + "/"
             print("The current directory is", os.getcwd()) 
             self.__send_control(Return_Codes.Code_200().encode() )
 
