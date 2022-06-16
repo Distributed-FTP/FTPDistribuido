@@ -5,10 +5,11 @@ import time
 import sys
 import tqdm
 from return_codes import Return_Codes
+from log import Log
 from help import Help_Commands
 
 class ServerFTP(Thread):
-    def __init__(self, connection, address, ip, port):
+    def __init__(self, connection, address, ip, port, log: Log, path):
         Thread.__init__(self)
         self.__ip = ip
         self.__port = port
@@ -28,10 +29,14 @@ class ServerFTP(Thread):
         self.type = 'A N'
         self.stru = 'F'
         self.is_anonymous = False
-        self.path = os.getcwd() + "/root/"
+        self.path = path + "/root/"
+        
         self.__off = False
-        self.users = None
-        self.password = None
+        self.__path_db = path + "/database.db"
+        self.__user = None
+        self.__password = None
+        
+        self.log = log
 
     '''
         Publics
@@ -43,7 +48,7 @@ class ServerFTP(Thread):
             if self.__off:
                 break
             
-            print("Waiting instructions \n")
+            self.log.LogMessageServer("Waiting instructions \n")
             try:
                 data = self.__receive()
                 data = data.decode('utf-8',errors='ignore')         
@@ -56,7 +61,7 @@ class ServerFTP(Thread):
             data = data.replace("\\r\\n", '')
             data = data.replace("\r\n", '')
             
-            print("Received instruction: {0}\n".format(data))
+            self.log.LogMessageServer("Received instruction: {0}\n".format(data))
 
             data_arr = data.split(' ')
 
@@ -67,14 +72,10 @@ class ServerFTP(Thread):
                 self.user_command(data)
             elif "PASS" in cmd:
                 self.pass_command(data)
-            elif "ACCT" in cmd:
-                self.acct_command(data)
             elif "CWD" in cmd:
                 self.cwd_command(data)
             elif "CDUP" in cmd:
                 self.cdup_command()
-            elif "SMNT" in cmd:
-                self.smnt_command()
             
             #Logout
             elif "REIN" in cmd:
@@ -106,9 +107,9 @@ class ServerFTP(Thread):
             elif "RETR" in cmd:
                 self.retr_command(data)
             elif "LIST" in cmd:
-                self.list_command()
+                self.list_command(data)
             elif "NLST" in cmd:
-                self.nlst_command()
+                self.nlst_command(data)
             elif "APPE" in cmd:
                 self.appe_command(data)
             elif "RNFR" in cmd:
@@ -139,8 +140,10 @@ class ServerFTP(Thread):
                 self.site_command()
             elif "NOOP" in cmd:
                 self.noop_command()
-            else:
+            elif len(data) != 0:
                 self.command_not_found()
+            else:
+                self.quit_command()
 
     '''
         Privates
@@ -156,12 +159,12 @@ class ServerFTP(Thread):
             self.data_connection = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             if self.pasive:
                 self.data_connection, self.data_address = self.server_connection.accept()
-                print(f'Conexion de datos aceptada en {self.data_address}')
+                self.log.LogWarning(f'Conexion de datos aceptada en {self.data_address}')
             else:
                 self.data_connection.connect(self.data_address)
-                print(f'Conectando a {self.data_address}')
+                self.log.LogWarning(f'Conectando a {self.data_address}')
         except socket.error as err:
-            print(err)
+            self.log.LogError(self.control_address[0], self.control_address[1], err)
         
     def __close_data_connection(self):
         try:
@@ -169,7 +172,7 @@ class ServerFTP(Thread):
             if self.pasive:
                 self.data_connection.close( )
         except socket.error as err:
-            print(err)
+            self.log.LogError(self.control_address[0], self.control_address[1],err)
     
     def __welcome_message(self):
         self.__send_control(Return_Codes.Code_220().encode())
@@ -179,6 +182,7 @@ class ServerFTP(Thread):
         return res
     
     def __close(self):
+        self.__off = True
         self.control_connection.close()
 
     def __has_access(self, file : str):
@@ -210,10 +214,12 @@ class ServerFTP(Thread):
         users = ""
         if u == "anonymous\r\n" or u == "anonymous":
             self.is_anonymous = True
+            self.__user = "anonymous"
             self.path += "anonymous/"
             self.__send_control(Return_Codes.Code_230().encode())
+            self.log.LogOk(self.control_address[0], self.control_address[1], "Usuario Anonymous conectado.")
         else:
-            with open("database.db", 'rb') as f:
+            with open(self.__path_db, 'rb') as f:
                 while True:
                     bytes_read = f.read()
                     if bytes_read == b'':
@@ -226,25 +232,40 @@ class ServerFTP(Thread):
             accepted = False
             for i in range(1,len(users)-1,2):
                 if str(users[i])==str(u):
-                    self.users = users[i]
-                    self.password = users[i+1]
+                    self.__user = users[i]
+                    self.__password = users[i+1]
                     accepted = True
             if accepted:
                 self.__send_control(Return_Codes.Code_331(u).encode())
+                self.log.LogOk(self.control_address[0], self.control_address[1], f"Usuario {u} necesita insertar contrasenna.")
             else:
                 self.__send_control(Return_Codes.Code_332().encode())
+                self.log.LogError(self.control_address[0], self.control_address[1], f"Usuario {u} no existe.")
 
     def pass_command(self, data):
-        p = data.split(" ")[1] #password 
-        if p == self.password:
+        if self.__user == None:
+            self.__send_control(Return_Codes.Code_530().encode())
+            self.log.LogError(self.control_address[0], self.control_address[1], f"Necesita utilizar el comando USER antes.")
+            return
+        line = data.split(" ")
+        if len(line) != 2:
+            self.__send_control(Return_Codes.Code_501().encode())
+            self.log.LogError(self.control_address[0], self.control_address[1], f"Comando incorrecto.")
+            return
+        p = line[1] #password 
+        if p == self.__password:
+            self.__password = None
             self.__send_control(Return_Codes.Code_230().encode())
+            self.log.LogOk(self.control_address[0], self.control_address[1], f"Usuario {self.__user} conectado.")
         else:
             self.__send_control(Return_Codes.Code_332().encode())
-
-    def acct_command(self, data):
-        None
+            self.log.LogError(self.control_address[0], self.control_address[1], f"La contrasenna del usuario {self.__user} no es correcta.")
 
     def cwd_command(self, data):
+        if self.__user == None:
+            self.__send_control(Return_Codes.Code_530().encode())
+            self.log.LogError(self.control_address[0], self.control_address[1], f"Necesita acceso para cambiar de directorio")
+            return
         names = data.split(" ")
         pathname = ""
         for i in range(1,len(names)):
@@ -257,6 +278,12 @@ class ServerFTP(Thread):
                 pathname = pathname + "/"
             else:
                 pathname = self.path + pathname + "/"
+            
+            if not os.path.isdir(pathname):
+                self.__send_control(Return_Codes.Code_550().encode())
+                self.log.LogError(self.control_address[0], self.control_address[1], f"La ruta {pathname} no existe.")
+                return
+            
             if not self.is_anonymous and pathname.find("root") != -1:
                 os.chdir(pathname)
                 self.path = pathname
@@ -265,17 +292,22 @@ class ServerFTP(Thread):
                 self.path = pathname
             else:
                 self.__send_control(Return_Codes.Code_550().encode())
+                self.log.LogError(self.control_address[0], self.control_address[1], f"El usuario {self.__user} no tiene acceso a la ruta {pathname}.")
                 return
             
-            print("The current directory is", os.getcwd()) 
+            self.log.LogOk(self.control_address[0], self.control_address[1], f"El usuario {self.__user} accedio al directorio {os.getcwd()}.") 
             self.__send_control(Return_Codes.Code_250().encode())
 
         # Caching the exception     
         except OSError as error: 
-            print(f"Something wrong with specified directory. Exception- {error}")
+            self.log.LogError(self.control_address[0], self.control_address[1], f"Algo salio mal para el usuario {self.__user}. Excepcion- {error}.")
             self.__send_control(Return_Codes.Code_550().encode())
 
     def cdup_command(self):
+        if self.__user == None:
+            self.__send_control(Return_Codes.Code_530().encode())
+            self.log.LogError(self.control_address[0], self.control_address[1], f"Necesita acceso para cambiar de directorio.")
+            return
         paths = self.path.split('/')
         i = len(paths) - 1
         continue_delete = True
@@ -291,22 +323,28 @@ class ServerFTP(Thread):
             if p != '':
                 pathname = pathname + p + "/"   
         try: 
+            if not os.path.isdir(pathname):
+                self.__send_control(Return_Codes.Code_550().encode())
+                self.log.LogError(self.control_address[0], self.control_address[1], f"La ruta {pathname} no existe.")
+                return
+            
             if not self.is_anonymous and pathname.find("root") != -1:
                 os.chdir(pathname + "/")
                 self.path = pathname + "/"
             elif self.is_anonymous and pathname.find("anonymous") != -1:
                 os.chdir(pathname + "/")
                 self.path = pathname + "/"
-            print("The current directory is", os.getcwd()) 
+            else:
+                self.log.LogError(self.control_address[0], self.control_address[1], f"El usuario {self.__user} no tiene acceso al directorio {pathname}.")
+                self.__send_control(Return_Codes.Code_550().encode())
+                return
+            self.log.LogOk(self.control_address[0], self.control_address[1], f"El usuario {self.__user} entro al directorio {os.getcwd()}.")
             self.__send_control(Return_Codes.Code_200().encode() )
 
         # Caching the exception     
         except OSError as error:
-            print(f"Something wrong with specified directory. Exception- {error}")
+            self.log.LogError(self.control_address[0], self.control_address[1], f"Algo salio mal para el usuario {self.__user}. Excepcion- {error}.")
             self.__send_control(Return_Codes.Code_550().encode())
-
-    def smnt_command(self):
-        None
 
 
     '''
@@ -325,13 +363,15 @@ class ServerFTP(Thread):
         
         try:
             time_stop = int(data.split(' ')[1])
-            self.__send_control(Return_Codes.Code_120().encode() )
+            self.__send_control(Return_Codes.Code_120(time_stop).encode())
+            self.log.LogWarning(self.control_address[0], self.control_address[1], f"El servicio se reinicira en {time_stop} minutos.")
             time.sleep(time_stop * 60)
         except:
             self.__send_control(Return_Codes.Code_220().encode() )
         
     def quit_command(self):
         self.__send_control(Return_Codes.Code_221().encode())
+        self.log.LogOk(self.control_address[0], self.control_address[1], f"El usuario {self.__user} ha cerrado su sesion.")
         self.__close()
 
 
@@ -339,6 +379,10 @@ class ServerFTP(Thread):
         Transfer parameters
     '''
     def port_command(self, data):
+        if self.__user == None:
+            self.__send_control(Return_Codes.Code_530().encode())
+            self.log.LogError(self.control_address[0], self.control_address[1], f"Necesita acceso para solicitar el puerto.")
+            return
         cmd_addr = data.split(" ")
         cmd_ip_port = cmd_addr[1].split(",")
 
@@ -353,21 +397,36 @@ class ServerFTP(Thread):
         self.__send_control(Return_Codes.Code_200().encode())
 
     def pasv_command(self):
+        if self.__user == None:
+            self.__send_control(Return_Codes.Code_530().encode())
+            self.log.LogError(self.control_address[0], self.control_address[1], f"Necesita acceso para cambiar al modo pasivo.")
+            return
         self.pasive = True
         self.server_connection = socket.socket()
         self.server_connection.bind((self.control_connection.getsockname()[0], 0))
-        self.server_connection.listen(5)   
-        self.__send_control(Return_Codes.Code_227(self.server_connection.getsockname( )).encode())
+        self.server_connection.listen(5)
+        self.__send_control(Return_Codes.Code_227(self.control_connection.getsockname( )).encode())
+        self.log.LogOk(self.control_address[0], self.control_address[1], f"El usuario {self.__user} ha activado el modo pasivo.")
 
     def mode_command(self, data):
+        if self.__user == None:
+            self.__send_control(Return_Codes.Code_530().encode())
+            self.log.LogError(self.control_address[0], self.control_address[1], f"Necesita acceso para cambiar de modo.")
+            return
         mode = data.split(" ")[1]
         if mode != 'S' and mode != 'B' and mode != 'C':
             self.__send_control(Return_Codes.Code_501().encode())
+            self.log.LogError(self.control_address[0], self.control_address[1], f"El usuario {self.__user} ha insertado argumentos incorrectos para la funcion MODE.")
             return
         self.mode = mode
         self.__send_control(Return_Codes.Code_200().encode())
+        self.log.LogOk(self.control_address[0], self.control_address[1], f"El usuario {self.__user} ha activado el modo {self.mode}.")
 
     def type_command(self,data):
+        if self.__user == None:
+            self.__send_control(Return_Codes.Code_530().encode())
+            self.log.LogError(self.control_address[0], self.control_address[1], f"Necesita acceso para cambiar de tipo.")
+            return
         type_list = data.split(' ')
         
         if len(type_list) == 2:
@@ -377,46 +436,66 @@ class ServerFTP(Thread):
 
         if type_list[1] != "I" and type_list[1] != "L" and type_list[1] != "A" and type_list[1] != "E":
             self.__send_control(Return_Codes.Code_501().encode())
+            self.log.LogError(self.control_address[0], self.control_address[1], f"El usuario {self.__user} ha insertado argumentos incorrectos para la funcion TYPE.")
             return
         elif len(type_list) == 3 and type_list[1] != "I":
             self.__send_control(Return_Codes.Code_501().encode())
+            self.log.LogError(self.control_address[0], self.control_address[1], f"El usuario {self.__user} ha insertado argumentos incorrectos para la funcion TYPE.")
             return
         elif len(type_list) == 4:
             #Bug con el número de bytes
             if type_list[1] == "L" and type_list[2] != 123:
                 self.__send_control(Return_Codes.Code_501().encode())
+                self.log.LogError(self.control_address[0], self.control_address[1], f"El usuario {self.__user} ha insertado argumentos incorrectos para la funcion TYPE.")
                 return
             elif type_list[1] == "A" or type_list[1] == "E" and type_list[2] != "N" and type_list[2] != "T" and type_list[2] != "C":
                 self.__send_control(Return_Codes.Code_501().encode())
+                self.log.LogError(self.control_address[0], self.control_address[1], f"El usuario {self.__user} ha insertado argumentos incorrectos para la funcion TYPE.")
                 return
         self.type = type
         self.__send_control(Return_Codes.Code_200().encode())
+        self.log.LogOk(self.control_address[0], self.control_address[1], f"El usuario {self.__user} ha activado el tipo {self.type}.")
 
     def stru_command(self, data):
+        if self.__user == None:
+            self.__send_control(Return_Codes.Code_530().encode())
+            self.log.LogError(self.control_address[0], self.control_address[1], f"Necesita acceso para cambiar de estructura.")
+            return
         stru = data.split(" ")[1]
         if stru != 'F' and stru != 'R' and stru != 'P':
             self.__send_control(Return_Codes.Code_501().encode())
+            self.log.LogError(self.control_address[0], self.control_address[1], f"El usuario {self.__user} ha insertado argumentos incorrectos para la funcion STRU.")
             return
         self.stru = stru
         self.__send_control(Return_Codes.Code_200().encode())
+        self.log.LogOk(self.control_address[0], self.control_address[1], f"El usuario {self.__user} ha activado el tipo {self.type}.")
 
 
     '''
         File action commands
     '''
     def allo_command(self, data):
+        if self.__user == None:
+            self.__send_control(Return_Codes.Code_530().encode())
+            self.log.LogError(self.control_address[0], self.control_address[1], f"Necesita acceso")
+            return
         self.__send_control(Return_Codes.Code_200().encode())
 
     def rest_command(self, data):
-        None
+        if self.__user == None:
+            self.__send_control(Return_Codes.Code_530().encode())
+            self.log.LogError(self.control_address[0], self.control_address[1], f"Necesita acceso")
+            return
 
     def stor_command(self, data):
-        # str_size = struct.unpack("i", self.__send_control.recv(4))[0]
-
-        # filename = self.__send_control.recv(str_size)
+        if self.__user == None:
+            self.__send_control(Return_Codes.Code_530().encode())
+            self.log.LogError(self.control_address[0], self.control_address[1], f"Necesita acceso para subir el fichero.")
+            return
+        
         filename = data.split(" ")[1]
         
-        print('Upload file... ',filename)
+        self.log.LogWarning(f"Subiendo archivo... {filename}", self.control_address[0], self.control_address[1])
 
         self.__send_control(Return_Codes.Code_150().encode())
         self.__open_data_connection()
@@ -434,24 +513,31 @@ class ServerFTP(Thread):
                     f.write(bytes_recieved)
             
             self.__send_control(Return_Codes.Code_226().encode())
+            self.log.LogOk(self.control_address[0], self.control_address[1], f"El usuario {self.__user} ha subido el archivo {filename}.")
         except OSError as error:
-            print("Something wrong with specified directory. Exception- ", error)
+            self.log.LogError(self.control_address[0], self.control_address[1], f"Algo salio mal para el usuario {self.__user}. Excepcion- {error}.")
             self.__send_control(Return_Codes.Code_550().encode())
         self.__close_data_connection()
-        print('Upload Successful\n')
 
     def stou_command(self, data):
-        None
+        if self.__user == None:
+            self.__send_control(Return_Codes.Code_530().encode())
+            self.log.LogError(self.control_address[0], self.control_address[1], f"Necesita acceso")
+            return
 
     def retr_command(self,data):
+        if self.__user == None:
+            self.__send_control(Return_Codes.Code_530().encode())
+            self.log.LogError(self.control_address[0], self.control_address[1], "Necesita acceso para descargar un archivo.")
+            return
         filename = data.split(" ")[1]
         
-        print('Download file... ',filename)
+        self.log.LogWarning(f"Descargando archivo... {filename}", self.control_address[0], self.control_address[1])
 
         try:
             filesize = os.path.getsize(filename)
         except OSError as error:
-            print("Something wrong with specified directory. Exception- ", error)
+            self.log.LogError(self.control_address[0], self.control_address[1], f"Algo salio mal para el usuario {self.__user}. Excepcion- {error}.")
             self.__send_control(Return_Codes.Code_550().encode())
             return
 
@@ -475,30 +561,57 @@ class ServerFTP(Thread):
                     self.data_connection.send(bytes_read)
                     progress.update(len(bytes_read))
             self.__send_control(Return_Codes.Code_226().encode())
+            self.log.LogOk(self.control_address[0], self.control_address[1], f"El usuario {self.__user} ha descargado el archivo {filename}.")
                 
         except OSError as error:
-            print("Something wrong with specified directory. Exception- ", error)
+            self.log.LogError(self.control_address[0], self.control_address[1], f"Algo salio mal para el usuario {self.__user}. Excepcion- {error}.")
             self.__send_control(Return_Codes.Code_550().encode())
         self.data_connection.close()
         
-    def list_command(self):
+    def list_command(self, data):
+        if self.__user == None:
+            self.__send_control(Return_Codes.Code_530().encode())
+            self.log.LogError(self.control_address[0], self.control_address[1], f"Necesita acceso para listar un directorio.")
+            return
+        data = str(data).replace("LIST ", "")
+        data = str(data).replace("LIST", "")
+        if len(data) != 0:
+            path = data
+        else:
+            path = self.path
+        
         self.__send_control(Return_Codes.Code_150().encode())
         self.__open_data_connection()
-        l = os.listdir(self.path)
+        
+        if not os.path.isdir(path):
+            self.__send_control(Return_Codes.Code_550().encode())
+            self.log.LogError(self.control_address[0], self.control_address[1], f"La ruta {path} no existe.")
+            return
+        l = os.listdir(path)
         for t in l:
             if self.__has_access(t):
-                k = self.__to_list_item(t, self.path)
+                k = self.__to_list_item(t, path)
                 self.__send_data(k.encode())
         self.__close_data_connection()
         self.__send_control(Return_Codes.Code_226().encode())
+        self.log.LogOk(self.control_address[0], self.control_address[1], f"El usuario {self.__user} ha listado el directorio {path}.")
 
-    def nlst_command(self):
-        None
+    def nlst_command(self, data):
+        data = str(data).replace("NLIST ", "")
+        data = str(data).replace("NLIST", "")
+        self.list_command(data)
 
     def appe_command(self, data):
-        None
+        if self.__user == None:
+            self.__send_control(Return_Codes.Code_530().encode())
+            self.log.LogError(self.control_address[0], self.control_address[1], f"Necesita acceso.")
+            return
 
     def rnfr_command(self, data):
+        if self.__user == None:
+            self.__send_control(Return_Codes.Code_530().encode())
+            self.log.LogError(self.control_address[0], self.control_address[1], f"Necesita acceso para solicitar cambiar el nombre a un archivo/directorio.")
+            return
         path_name = str(data).split(" ")
         path_name.remove("RNFR")
         
@@ -510,10 +623,23 @@ class ServerFTP(Thread):
             else:
                 pathname = pathname + path
             i+=1
+        if not os.path.isdir(pathname):
+            self.__send_control(Return_Codes.Code_550().encode())
+            self.log.LogError(self.control_address[0], self.control_address[1], f"La ruta {pathname} no existe.")
+            return
         self.__fd_rename = pathname
         self.__send_control(Return_Codes.Code_350().encode())
 
     def rnto_command(self, data):
+        if self.__user == None:
+            self.__send_control(Return_Codes.Code_530().encode())
+            self.log.LogError(self.control_address[0], self.control_address[1], f"Necesita acceso para renombrar el archivo/directorio.")
+            return
+        if self.__fd_rename == None:
+            self.__send_control(Return_Codes.Code_553().encode())
+            self.log.LogError(self.control_address[0], self.control_address[1], f"No existe ruta a la que se deba cambiar el nombre.")
+            return
+        
         path_name = str(data).split(" ")
         path_name.remove("RNTO")
         
@@ -526,17 +652,25 @@ class ServerFTP(Thread):
                 pathname = pathname + path
             i+=1
         try:
+            if not os.path.isdir(self.__fd_rename):
+                self.__send_control(Return_Codes.Code_550().encode())
+                self.log.LogError(self.control_address[0], self.control_address[1], f"La ruta {self.__fd_rename} no existe.")
+                return
             os.rename(self.__fd_rename, pathname)
-            self.__fd_rename = None
-            print("The current directory is", os.getcwd()) 
             self.__send_control(Return_Codes.Code_250().encode())
+            self.log.LogOk(self.control_address[0], self.control_address[1], f"El usurio {self.__user} ha renombrado satisfactoriamente el archivo {self.__fd_rename} a {pathname}.")
+            self.__fd_rename = None
 
         # Caching the exception     
         except OSError as error: 
-            print(f"Something wrong with specified directory. Exception- {error}")
+            self.log.LogError(self.control_address[0], self.control_address[1], f"Algo salio mal para el usuario {self.__user}. Excepcion- {error}.")
             self.__send_control(Return_Codes.Code_550().encode())
 
     def dele_command(self, data):
+        if self.__user == None:
+            self.__send_control(Return_Codes.Code_530().encode())
+            self.log.LogError(self.control_address[0], self.control_address[1], f"Necesita acceso para eliminar el archivo.")
+            return
         path_name = str(data).split(" ")
         path_name.remove("DELE")
         
@@ -548,22 +682,23 @@ class ServerFTP(Thread):
             else:
                 pathname = pathname + path
             i+=1
+        if not os.path.isfile(pathname):
+            self.__send_control(Return_Codes.Code_550().encode())
+            self.log.LogError(self.control_address[0], self.control_address[1], f"El archivo {pathname} no existe.")
+            return
         try: 
-            os.rmdir(pathname)
-            print("The current directory is", os.getcwd()) 
+            os.remove(pathname)
+            self.log.LogOk(self.control_address[0], self.control_address[1], f"El usuario {self.__user} ha eliminado el archivo {pathname}.")
             self.__send_control(Return_Codes.Code_250().encode())
-
-        # Caching the exception     
-        except: 
-            try: 
-                os.remove(pathname)
-                print("The current directory is", os.getcwd()) 
-                self.__send_control(Return_Codes.Code_250().encode())
-            except OSError as error:
-                print(f"Something wrong with specified directory. Exception- {error}")
-                self.__send_control(Return_Codes.Code_550().encode())
+        except OSError as error:
+            self.log.LogError(self.control_address[0], self.control_address[1], f"Algo salio mal para el usuario {self.__user}. Excepcion- {error}.")
+            self.__send_control(Return_Codes.Code_550().encode())
 
     def rmd_command(self, data):
+        if self.__user == None:
+            self.__send_control(Return_Codes.Code_530().encode())
+            self.log.LogError(self.control_address[0], self.control_address[1], f"Necesita acceso para eliminar el directorio.")
+            return
         path_name = str(data).split(" ")
         path_name.remove("RMD")
         
@@ -577,16 +712,24 @@ class ServerFTP(Thread):
             i+=1
         
         try: 
+            if not os.path.isdir(pathname):
+                self.__send_control(Return_Codes.Code_550().encode())
+                self.log.LogError(self.control_address[0], self.control_address[1], f"El directorio {pathname} no existe.")
+                return
             os.rmdir(pathname)
-            print("The current directory is", os.getcwd()) 
+            self.log.LogOk(self.control_address[0], self.control_address[1], f"El usuario {self.__user} ha eliminado el directorio {pathname}.")
             self.__send_control(Return_Codes.Code_250().encode())
 
         # Caching the exception     
         except OSError as error:
-            print(f"Something wrong with specified directory. Exception- {error}")
+            self.log.LogError(self.control_address[0], self.control_address[1], f"Algo salio mal para el usuario {self.__user}. Excepcion- {error}.")
             self.__send_control(Return_Codes.Code_550().encode())
 
     def mkd_command(self, data):
+        if self.__user == None:
+            self.__send_control(Return_Codes.Code_530().encode())
+            self.log.LogError(self.control_address[0], self.control_address[1], f"Necesita acceso para crear el directorio/archivo.")
+            return
         path_name = str(data).split(" ")
         path_name.remove("MKD")
         
@@ -600,17 +743,22 @@ class ServerFTP(Thread):
             i+=1
 
         try:
+            if os.path.isdir(pathname):
+                self.__send_control(Return_Codes.Code_550().encode())
+                self.log.LogError(self.control_address[0], self.control_address[1], f"Ya existe {pathname} como ruta.")
+                return
             os.mkdir(pathname)
-            print("The current directory is", os.getcwd()) 
+            self.log.LogOk(self.control_address[0], self.control_address[1], f"El usuario {self.__user} ha creado la ruta {pathname}.")
             self.__send_control(Return_Codes.Code_257(pathname).encode())
 
         # Caching the exception     
         except OSError as error: 
-            print("Something wrong with specified directory. Exception- ", error)
+            self.log.LogError(self.control_address[0], self.control_address[1], f"Algo salio mal para el usuario {self.__user}. Excepcion- {error}.")
             self.__send_control(Return_Codes.Code_550().encode())
 
     def pwd_command(self, data):
         self.__send_control(Return_Codes.Code_257(self.path).encode())
+        self.log.LogOk(self.control_address[0], self.control_address[1], f"El usuario {self.__user} ha mostrado el contenido del directorio {self.path}.")
 
     def abor_command(self):
         try:
@@ -619,6 +767,7 @@ class ServerFTP(Thread):
         except:
             self.__send_control(Return_Codes.Code_426(self.path).encode())
             self.__send_control(Return_Codes.Code_226(self.path).encode())
+        self.log.LogWarning(self.control_address[0], self.control_address[1], f"El usuario {self.__user} cerro la conexion de datos.")
 
 
     '''
@@ -626,9 +775,7 @@ class ServerFTP(Thread):
     '''
     def syst_command(self):
         self.__send_control(Return_Codes.Code_215(sys.platform).encode())
-
-    def stat_command(self):
-        None
+        self.log.LogError(self.control_address[0], self.control_address[1], f"El usuario {self.__user} solicito la informacion del sistema: {sys.platform}.")
 
     def help_command(self, data):
         data_array = str(data).split(' ')
@@ -715,21 +862,22 @@ class ServerFTP(Thread):
                 self.__send_control(Return_Codes.Code_211(Help_Commands.NOOP()).encode())
             else:
                 self.command_not_found()
+            self.log.LogOk(self.control_address[0], self.control_address[1], f"El usuario ha solicitado ayuda.")
         elif(len(data_array) == 1):
-            self.__send_control(Return_Codes.Code_214("The following commands are recognized.").encode())
+            self.__send_control(Return_Codes.Code_214("El comando reconocido").encode())
             self.__send_control(Help_Commands.ALL().encode())
             self.__send_control(Return_Codes.Code_214("Help OK").encode())
+            self.log.LogOk(self.control_address[0], self.control_address[1], f"El usuario ha solicitado ayuda.")
         else:
             self.__send_control(Return_Codes.Code_501().encode())
+            self.log.LogError(self.control_address[0], self.control_address[1], f"El usuario ha insertado argumentos incorrectos para la funcion HELP.")
 
     '''
         Miscellaneous commands
     '''
-    def site_command(self):
-        None
-
     def noop_command(self):
         self.__send_control(Return_Codes.Code_200().encode())
 
     def command_not_found(self):
         self.__send_control(Return_Codes.Code_500().encode())
+        self.log.LogError(self.control_address[0], self.control_address[1], f"El usuario ha insertado un comando no reconocido.")
