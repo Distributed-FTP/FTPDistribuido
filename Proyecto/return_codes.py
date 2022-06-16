@@ -44,8 +44,8 @@ class Return_Codes():
     def Code_226():
         return '226 Cerrando la conexión de datos.\r\n'
          
-    def Code_227():
-        return f'227 Iniciando modo pasivo.\r\n'
+    def Code_227(data):
+        return f'227 Iniciando modo pasivo en {data}.\r\n'
 
     def Code_230():
         return '230 Usuario conectado, continúe.\r\n'
