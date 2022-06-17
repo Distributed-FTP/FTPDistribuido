@@ -4,20 +4,20 @@ import sys,subprocess
 import os
 #import nis as ni
 import socket
-
+from matplotlib.pyplot import get
+import json
 
  
-
-
 #Si el nodo i de la red esta activo se guarda True, esta lista servira para comprobar constantemente 
-# si un nodo se desactivo o si un nodo se activo 
+# si un nodo se desactivo o si un nodo se activo
 controlDNodos=[]
-
 
 #esta variable es para saber el estado en que se encuentra chord , si buscando un elemento , si anadiendo un elemento o si esta reorganizando
 #los nodos
-estadoDChord=None    
-listaDNodos=list()
+estadoDChord=None
+
+#Esta lista es para guardar los IP de los nodos del sistema en el orden en que se van ordenando por ids
+listaDNodos=[]
 
 def BuscaNodosEnRed():
  if len(sys.argv)!=2:
@@ -38,7 +38,6 @@ def BuscaNodosEnRed():
    
 BuscaNodosEnRed()
 
-
 class Node:
     def __init__(self,ip):
         self._id=None
@@ -47,25 +46,28 @@ class Node:
         self._predecesor=None
         self._sucesor=None
         self.fingertable=None
+        self._soyLider=False  #Todo Nodo debe saber si es el lider , en caso de que lo sea debe realizar acciones especificas
        # self.fingertable = {((self._id+(i**2))%2**160) : self._ip for i in range(160)} #!ID:IP
 
 
     def start_comunication(self):
+
+       #if mac=='94-E2-3C-07-91-08':
+
         try:
+            self._soyLider=True
+            self.id=0
+            listaDNodos.append("{}:{}".format(self._ip,0))
+            NodosEnElsistema=1
             BUFFER_SIZE=1024
             self.server = socket.socket(
                 socket.AF_INET, socket.SOCK_STREAM)
             self.server.bind((self._ip,12345))
-            self.server.listen(1) 
-            try:
-             self.server.settimeout(1000)
-             conn, addr = self.server.accept() # Establecemos la conexión con el cliente 
-            except:
-                print("El servidor queda deshabilitado")
+            self.server.listen(1000) 
+            #self.server.settimeout(1000)
+            conn, addr = self.server.accept() # Establecemos la conexión con el cliente 
+            if conn: 
 
-           
-            if conn:
-              print('[*] Conexión establecida') 
               while True:
             # Recibimos bytes, convertimos en str
                data = conn.recv(BUFFER_SIZE)
@@ -73,12 +75,46 @@ class Node:
                if not data:
                 break
                else:
-                print(data)
-                print('[*] Datos recibidos: {}'.format(data.decode('utf-8'))) 
-               conn.send(data) # Hacemos echo convirtiendo de nuevo a bytes
+                #if data.decode('utf-8')=="Soy Nodo FTP":
+                 print(data)
+                 print('[*] Datos recibidos: {}'.format(data.decode('utf-8'))) 
+                 conn.send(b"idpredecesor") # Hacemos echo convirtiendo de nuevo a bytes
+                 listaDNodos.append("{}:{}".format(addr[0],NodosEnElsistema))
+                 #list=json.dumps(listaDNodos)
+                 #list=list.encode()
+                 #self.server.send(list)
+                #else:
+                 #  conn.close()
+
+
         except socket.error:
-            prRed('Error abriendo socket')
+           # prRed('Error abriendo socket')
             return
+        
+       #else:
+        SERVER_HOST = "DESKTOP-P0GKUJT"
+        SERVER_PORT = 12345
+
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+
+          s.connect((SERVER_HOST, SERVER_PORT))
+          #nombre_d_equipo=socket.gethostname()
+          #ip=socket.gethostbyname(nombre_d_equipo)
+
+          s.send(b"Soy Nodo FTP")
+          #s.send(b"{}".__format__(ip))
+          data = s.recv(1024)
+          decodificado=data.decode()
+          #nodo=Node(int(decodificado[13:len(decodificado)-1])+1)
+          #data=s.recv(1024)
+          #data=data.decode()
+          #listaDNodos=json.loads(data)
+          
+
+
+
+
+
 
 
 if __name__ == '__main__':
@@ -138,23 +174,25 @@ def leave(id):
 
 Nodo= Node()
 
-def DameIP():
-        interfaces = ni.interfaces()
-        if 'eth0' in interfaces: #LAN
-            return ni.ifaddresses('eth0')[2][0]['addr']
-        elif 'enp0s31f6' in interfaces: #WIFI
-            return ni.ifaddresses('enp0s31f6')[2][0]['addr']
-        else:
-            ni.ifaddresses(interfaces[0])[2][0]['addr']
+#def DameIP():
+   #     interfaces = ni.interfaces()
+   #     if 'eth0' in interfaces: #LAN
+    #        return ni.ifaddresses('eth0')[2][0]['addr']
+   #     elif 'enp0s31f6' in interfaces: #WIFI
+   #         return ni.ifaddresses('enp0s31f6')[2][0]['addr']
+    #    else:
+   #         ni.ifaddresses(interfaces[0])[2][0]['addr']
 
-def ObtenerID(self):
-        mac = get_mac() #Retorna la direccion mac como entero de 48 bits
-        My_id = str(mac).join(random.choice(string.ascii_lowercase + string.ascii_uppercase + string.digits)
-                            for x in range(30))
-        sha = hashlib.sha1()
-        sha.update(My_id.encode('ascii'))
-        self.MyId = int(sha.hexdigest() ,16)
-        return  int(sha.hexdigest() ,16)
+#def ObtenerID(self):
+ #       mac = get_mac() #Retorna la direccion mac como entero de 48 bits
+  #      My_id = str(mac).join(random.choice(string.ascii_lowercase + string.ascii_uppercase + string.digits)
+   #                         for x in range(30))
+    #    sha = hashlib.sha1()
+     #   sha.update(My_id.encode('ascii'))
+      #  self.MyId = int(sha.hexdigest() ,16)
+       # return  int(sha.hexdigest() ,16)
+
+
 
 
 
