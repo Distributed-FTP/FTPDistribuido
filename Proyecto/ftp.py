@@ -1,3 +1,4 @@
+from random import Random
 import socket
 import os
 from threading import Thread
@@ -96,10 +97,6 @@ class ServerFTP(Thread):
                 self.stru_command()
 
             #File action commands
-            elif "ALLO" in cmd:
-                self.allo_command(data)
-            elif "REST" in cmd:
-                self.rest_command(data)
             elif "STOR" in cmd:
                 self.stor_command(data)
             elif "STOU" in cmd:
@@ -130,14 +127,10 @@ class ServerFTP(Thread):
             #Informational commands
             elif "SYST" in cmd:
                 self.syst_command()
-            elif "STAT" in cmd:
-                self.stat_command()
             elif "HELP" in cmd:
                 self.help_command(data)
 
             #Miscellaneous commands
-            elif "SITE" in cmd:
-                self.site_command()
             elif "NOOP" in cmd:
                 self.noop_command()
             elif len(data) != 0:
@@ -474,26 +467,19 @@ class ServerFTP(Thread):
     '''
         File action commands
     '''
-    def allo_command(self, data):
-        if self.__user == None:
-            self.__send_control(Return_Codes.Code_530().encode())
-            self.log.LogError(self.control_address[0], self.control_address[1], f"Necesita acceso")
-            return
-        self.__send_control(Return_Codes.Code_200().encode())
-
-    def rest_command(self, data):
-        if self.__user == None:
-            self.__send_control(Return_Codes.Code_530().encode())
-            self.log.LogError(self.control_address[0], self.control_address[1], f"Necesita acceso")
-            return
-
     def stor_command(self, data):
         if self.__user == None:
             self.__send_control(Return_Codes.Code_530().encode())
-            self.log.LogError(self.control_address[0], self.control_address[1], f"Necesita acceso para subir el fichero.")
+            self.log.LogError(self.control_address[0], self.control_address[1], f"Necesita acceso para subir el acrhivo.")
             return
         
-        filename = data.split(" ")[1]
+        names = data.split(" ")
+        filename = ""
+        for i in range(1,len(names)):
+            if i == len(names) - 1:
+                filename += str(names[i])
+            else:
+                filename += str(names[i]) + " "
         
         self.log.LogWarning(f"Subiendo archivo... {filename}", self.control_address[0], self.control_address[1])
 
@@ -522,15 +508,56 @@ class ServerFTP(Thread):
     def stou_command(self, data):
         if self.__user == None:
             self.__send_control(Return_Codes.Code_530().encode())
-            self.log.LogError(self.control_address[0], self.control_address[1], f"Necesita acceso")
+            self.log.LogError(self.control_address[0], self.control_address[1], f"acceso para subir el acrhivo.")
             return
+        
+        names = data.split(" ")
+        filename = ""
+        for i in range(1,len(names)):
+            if i == len(names) - 1:
+                filename += str(names[i])
+            else:
+                filename += str(names[i]) + " "
+        
+        random = Random()
+        filename = str(int(10000000000 * random.random())) + filename
+        
+        self.log.LogWarning(f"Subiendo archivo... {filename}", self.control_address[0], self.control_address[1])
+
+        self.__send_control(Return_Codes.Code_150().encode())
+        self.__open_data_connection()
+
+        readmode = 'w+b' if  self.type == 'I' else 'w'
+
+        try:
+            with open(filename, readmode) as f:
+                
+                while True:
+                    bytes_recieved = self.data_connection.recv(self.__buffer)
+                    
+                    if not bytes_recieved: break
+
+                    f.write(bytes_recieved)
+            
+            self.__send_control(Return_Codes.Code_226().encode())
+            self.log.LogOk(self.control_address[0], self.control_address[1], f"El usuario {self.__user} ha subido el archivo {filename}.")
+        except OSError as error:
+            self.log.LogError(self.control_address[0], self.control_address[1], f"Algo salio mal para el usuario {self.__user}. Excepcion- {error}.")
+            self.__send_control(Return_Codes.Code_550().encode())
+        self.__close_data_connection()
 
     def retr_command(self,data):
         if self.__user == None:
             self.__send_control(Return_Codes.Code_530().encode())
             self.log.LogError(self.control_address[0], self.control_address[1], "Necesita acceso para descargar un archivo.")
             return
-        filename = data.split(" ")[1]
+        names = data.split(" ")
+        filename = ""
+        for i in range(1,len(names)):
+            if i == len(names) - 1:
+                filename += str(names[i])
+            else:
+                filename += str(names[i]) + " "
         
         self.log.LogWarning(f"Descargando archivo... {filename}", self.control_address[0], self.control_address[1])
 
@@ -604,26 +631,53 @@ class ServerFTP(Thread):
     def appe_command(self, data):
         if self.__user == None:
             self.__send_control(Return_Codes.Code_530().encode())
-            self.log.LogError(self.control_address[0], self.control_address[1], f"Necesita acceso.")
+            self.log.LogError(self.control_address[0], self.control_address[1], f"Necesita acceso para añadir informacion a un archivo.")
             return
+        
+        names = data.split(" ")
+        filename = ""
+        for i in range(1,len(names)):
+            if i == len(names) - 1:
+                filename += str(names[i])
+            else:
+                filename += str(names[i]) + " "
+        
+        self.log.LogWarning(f"Modificando archivo... {filename}", self.control_address[0], self.control_address[1])
 
+        self.__send_control(Return_Codes.Code_150().encode())
+        self.__open_data_connection()
+
+        try:
+            with open(filename, 'a') as f:
+                
+                while True:
+                    bytes_recieved = self.data_connection.recv(self.__buffer)
+                    
+                    if not bytes_recieved: break
+
+                    f.write(bytes_recieved)
+            
+            self.__send_control(Return_Codes.Code_226().encode())
+            self.log.LogOk(self.control_address[0], self.control_address[1], f"El usuario {self.__user} ha modificado el archivo {filename}.")
+        except OSError as error:
+            self.log.LogError(self.control_address[0], self.control_address[1], f"Algo salio mal para el usuario {self.__user}. Excepcion- {error}.")
+            self.__send_control(Return_Codes.Code_550().encode())
+        self.__close_data_connection()
+        
     def rnfr_command(self, data):
         if self.__user == None:
             self.__send_control(Return_Codes.Code_530().encode())
             self.log.LogError(self.control_address[0], self.control_address[1], f"Necesita acceso para solicitar cambiar el nombre a un archivo/directorio.")
             return
-        path_name = str(data).split(" ")
-        path_name.remove("RNFR")
         
         pathname = self.path
-        i = 0
-        for path in path_name:
-            if i <= len(path_name)-2:
-                pathname = pathname + path + " "
+        names = data.split(" ")
+        for i in range(1,len(names)):
+            if i == len(names) - 1:
+                pathname += str(names[i])
             else:
-                pathname = pathname + path
-            i+=1
-        if not os.path.isdir(pathname):
+                pathname += str(names[i]) + " "
+        if not os.path.isfile(pathname) and not os.path.isdir(pathname):
             self.__send_control(Return_Codes.Code_550().encode())
             self.log.LogError(self.control_address[0], self.control_address[1], f"La ruta {pathname} no existe.")
             return
@@ -640,21 +694,17 @@ class ServerFTP(Thread):
             self.log.LogError(self.control_address[0], self.control_address[1], f"No existe ruta a la que se deba cambiar el nombre.")
             return
         
-        path_name = str(data).split(" ")
-        path_name.remove("RNTO")
-        
         pathname = self.path
-        i = 0
-        for path in path_name:
-            if i <= len(path_name)-2:
-                pathname = pathname + path + " "
+        names = data.split(" ")
+        for i in range(1,len(names)):
+            if i == len(names) - 1:
+                pathname += str(names[i])
             else:
-                pathname = pathname + path
-            i+=1
+                pathname += str(names[i]) + " "
         try:
-            if not os.path.isdir(self.__fd_rename):
+            if not os.path.isfile(self.__fd_rename) and not os.path.isdir(self.__fd_rename):
                 self.__send_control(Return_Codes.Code_550().encode())
-                self.log.LogError(self.control_address[0], self.control_address[1], f"La ruta {self.__fd_rename} no existe.")
+                self.log.LogError(self.control_address[0], self.control_address[1], f"El archivo/directorio {self.__fd_rename} no existe.")
                 return
             os.rename(self.__fd_rename, pathname)
             self.__send_control(Return_Codes.Code_250().encode())
@@ -671,17 +721,13 @@ class ServerFTP(Thread):
             self.__send_control(Return_Codes.Code_530().encode())
             self.log.LogError(self.control_address[0], self.control_address[1], f"Necesita acceso para eliminar el archivo.")
             return
-        path_name = str(data).split(" ")
-        path_name.remove("DELE")
-        
         pathname = self.path
-        i = 0
-        for path in path_name:
-            if i <= len(path_name)-2:
-                pathname = pathname + path + " "
+        names = data.split(" ")
+        for i in range(1,len(names)):
+            if i == len(names) - 1:
+                pathname += str(names[i])
             else:
-                pathname = pathname + path
-            i+=1
+                pathname += str(names[i]) + " "
         if not os.path.isfile(pathname):
             self.__send_control(Return_Codes.Code_550().encode())
             self.log.LogError(self.control_address[0], self.control_address[1], f"El archivo {pathname} no existe.")
@@ -699,17 +745,13 @@ class ServerFTP(Thread):
             self.__send_control(Return_Codes.Code_530().encode())
             self.log.LogError(self.control_address[0], self.control_address[1], f"Necesita acceso para eliminar el directorio.")
             return
-        path_name = str(data).split(" ")
-        path_name.remove("RMD")
-        
         pathname = self.path
-        i = 0
-        for path in path_name:
-            if i <= len(path_name)-2:
-                pathname = pathname + path + " "
+        names = data.split(" ")
+        for i in range(1,len(names)):
+            if i == len(names) - 1:
+                pathname += str(names[i])
             else:
-                pathname = pathname + path
-            i+=1
+                pathname += str(names[i]) + " "
         
         try: 
             if not os.path.isdir(pathname):
@@ -730,17 +772,13 @@ class ServerFTP(Thread):
             self.__send_control(Return_Codes.Code_530().encode())
             self.log.LogError(self.control_address[0], self.control_address[1], f"Necesita acceso para crear el directorio/archivo.")
             return
-        path_name = str(data).split(" ")
-        path_name.remove("MKD")
-        
         pathname = self.path
-        i = 0
-        for path in path_name:
-            if i <= len(path_name)-2:
-                pathname = pathname + path + " "
+        names = data.split(" ")
+        for i in range(1,len(names)):
+            if i == len(names) - 1:
+                pathname += str(names[i])
             else:
-                pathname = pathname + path
-            i+=1
+                pathname += str(names[i]) + " "
 
         try:
             if os.path.isdir(pathname):

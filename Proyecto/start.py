@@ -22,7 +22,7 @@ def server_listener():
     log.LogMessageServer(f'Servidor iniciado en {listen_sock.getsockname( )}\n')
     while True:
         connection, address = listen_sock.accept()
-        connection.settimeout(20)
+        connection.settimeout(5)
         log.LogWarning(f'Conexion aceptada en {address}')
         f = ServerFTP(connection, address, IP, PORT, log, path )
         f.start()

@@ -11,12 +11,6 @@ class Help_Commands():
         command = "CONTRASEÑA (PASS)"
         description = "El argumento es una cadena Telnet especificando la contraseña del usuario. Esta orden debe ir inmediatamente precedida por la orden USER y, para algunos ordenadores, completa la identificación del usuario para el control de acceso. Como la información de la contraseña es un dato confidencial, es preferible, en general, \"enmascararla\" o evitar mostrarla en pantalla. Parece que el servidor no tiene un medio a prueba de tontos para conseguir esto. Por tanto es responsabiliad del proceso user-FTP el ocultar la información sobre la contraseña."
         return command + "\n" + description
-        
-    def ACCT():
-        command = "CUENTA (ACCT)"
-        description = "Not Implemented"
-        #description = "El argumento es una cadena Telnet identificando la cuenta del usuario. Esta orden no está necesariamente relacionada con la orden USER, ya que algunos ordenadores pueden requerir una cuenta para acceder y otros sólo para cierto tipo de acceso, como almacenar ficheros. En este último caso, la orden se puede enviar en cualquier momento.\n\nHay códigos de respuesta para diferenciar automáticamente estos casos: cuando se requiere información de la cuenta, la respuesta a una orden PASS correcta es el código 332. Por otra parte, si NO se requiere esta información, la respuesta a una orden PASS correcta es 230; y si la cuenta se requiere para una orden enviada más tarde, el servidor debería devolver una respuesta 332 o una 532 dependiendo de que almacene (esté pendiente de recibir el comando ACCT) o descarte la orden, respectivamente."
-        return command + "\n" + description
     
     def CWD():
         command = "CAMBIO DE DIRECTORIO DE TRABAJO (CWD)"
@@ -26,12 +20,6 @@ class Help_Commands():
     def CDUP():
         command = "CAMBIAR AL DIRECTORIO PADRE (CDUP)"
         description = "Esta orden es un caso especial de CWD y se incluye para simplificar la implementación de programas para transferir árboles de directorios entre sistemas operativos que tienen diferentes formas de nombrar al directorio padre."
-        return command + "\n" + description
-        
-    def SMNT():
-        command = "MONTAR ESTRUCTURA (SMNT)"
-        description = "Not Implemented"
-        #description = "Esta orden permite al usuario montar un sistema de ficheros diferente sin alterar su información de entrada o de cuenta. Los parámetros de transferencia permanecen sin cambios. El argumento es un nombre de ruta especificando un directorio o alguna otra agrupación de ficheros dependiente del sistema."
         return command + "\n" + description
     
     def REIN():
@@ -68,18 +56,7 @@ class Help_Commands():
         command = "ESTRUCTURA DEL FICHERO (STRU)"
         description = "El argumento es un único carácter Telnet especificando una estructura de fichero de las descritas en la sección Representación de Datos y Almacenamiento.\n\nExisten los siguientes códigos para la estructura:\n\nF - Fichero (sin estructurar en registros)\nR - Estructurado en registros P - Estruturado en páginas\n\nLa estructura por defecto es Fichero."
         return command + "\n" + description
-        
-    def ALLO():
-        command = "SOLICITAR ESPACIO (ALLO)"
-        description = "Esta orden puede ser necesaria para que algunos servidores reserven suficiente espacio de almacenamiento para recibir el nuevo fichero.  El argumento debe ser un entero decimal indicando el número de bytes (usando el tamaño de byte lógico) de almacenamiento que se deben reservar. Para ficheros enviados con estructura en registros o páginas, puede ser necesario enviar el tamaño máximo de registro o página; esto se indica con un entero decimal como segundo argumento de la orden. Este segundo argumento es opcional, pero cuando se utilice, debe estar separado del primero por los caracteres Telnet <SP> R <SP>. A continueción de esta orden se deberá indicar una orden STOR o APPE. La orden ALLO debería tratarse como la orden NOOP (no operación) por los servidores que no necesitan conocer de antemano el tamaño del fichero y aquellos servidores que sólo interpreten el tamaño máximo de registro o página deberían admitir un valor inutil como primer argumento e ignorarlo."
-        return command + "\n" + description
-        
-    def REST():
-        command = "RECOMENZAR (REST)"
-        description = "Not Implemented"
-        #description = "El argumento representa un marcador del servidor a partir del cual debe recomenzar la transferencia. La orden no realiza la transferencia del fichero, pero hace que el puntero de lectura o escritura del fichero se sitúe a continuación del punto indicado. A continuación de esta orden se debe enviar la orden de servicio FTP apropiada que hará que continúe la transferencia del fichero."
-        return command + "\n" + description
-        
+                
     def STOR():
         command = "ALMACENAR (STOR)"
         description = "Esta orden hace que el server-DTP lea los datos transferidos por la conexión de datos y los guarde en un fichero en el servidor. Si el fichero especificado en el nombre de ruta existe en el servidor, su contenido se debe reemplazar con los datos recibidos. Se crea un fichero nuevo en el servidor si el indicado no existía ya."
@@ -88,7 +65,7 @@ class Help_Commands():
     def STOU():
         command = "ALMACENAR UNICO (STOU)"
         description = "Not Implemented"
-        #description = "Esta orden se comporta igual que STOR sólo que el fichero resultante se crea en el directorio actual con un nombre único para ese directorio."
+        description = "Esta orden se comporta igual que STOR sólo que el fichero resultante se crea en el directorio actual con un nombre único para ese directorio."
         return command + "\n" + description
         
     def RETR():
@@ -104,13 +81,13 @@ class Help_Commands():
     def NLST():
         command = " LISTAR NOMBRES (NLST)"
         description = "Not Implemented"
-        #description = "Esta orden hace que se envíe un listado de directorio desde el servidor. El nombre de ruta indica un directorio u otra agrupación de ficheros específica del sistema; si no hay argumento, se asume el directorio actual. Los datos se transfieren en formato ASCII o EBCDIC a través de la conexión de datos separados unos de otros por <CRLF> o <NL>. (Una vez más el usuario se debe asegurar con TYPE). La función de esta orden es devolver información que pueda ser usada por un programa para procesar posteriormente los ficheros automáticamente. Por ejemplo, implementando una función que recupere varios ficheros."
+        description = "Esta orden hace que se envíe un listado de directorio desde el servidor. El nombre de ruta indica un directorio u otra agrupación de ficheros específica del sistema; si no hay argumento, se asume el directorio actual. Los datos se transfieren en formato ASCII o EBCDIC a través de la conexión de datos separados unos de otros por <CRLF> o <NL>. (Una vez más el usuario se debe asegurar con TYPE). La función de esta orden es devolver información que pueda ser usada por un programa para procesar posteriormente los ficheros automáticamente. Por ejemplo, implementando una función que recupere varios ficheros."
         return command + "\n" + description
         
     def APPE():
         command = "AÑADIR (con creación) (APPE)"
         description = "Not Implemented"
-        #description = "Esta orden hace que el server-DTP reciba datos a través de la conexión de control y los guarde en un fichero en el servidor. Si el fichero especificado en el nombre de ruta existe, los datos se añaden a ese fichero; si no, se crea un fichero nuevo en el servidor."
+        description = "Esta orden hace que el server-DTP reciba datos a través de la conexión de control y los guarde en un fichero en el servidor. Si el fichero especificado en el nombre de ruta existe, los datos se añaden a ese fichero; si no, se crea un fichero nuevo en el servidor."
         return command + "\n" + description
         
     def RNFR():
@@ -153,21 +130,9 @@ class Help_Commands():
         description = "Esta orden devuelve el tipo de sistema operativo del servidor."
         return command + "\n" + description
         
-    def STAT():
-        command = "ESTADO (STAT)"
-        description = "Not Implemented"
-        #description = "Esta orden hace que el servidor nos envía una respuesta con su estado a través de la conexión de control. La orden se puede enviar durante la transferencia de un fichero (junto con las señales Telnet IP y Synch--vea la sección Ordenes FTP) en cuyo caso el servidor responderá con el estado de la operación en progreso, o se puede enviar entre transferencias de ficheros. En este último caso, la orden puede llevar un argumento. Si el argumento es un nombre de ruta, la orden es similar a LIST, excepto que los datos se devolverán por la conexión de control. Si no hay ningún argumento, el servidor devolverá información general del estado del proceso servidor FTP. Esto debería incluir los valores actuales de los parámetros de transferencia y el estado de las conexiones."
-        return command + "\n" + description
-        
     def HELP():
         command = "AYUDA (HELP)"
         description = "Esta orden hace que el servidor envíe información sobre la implementación del FTP a través de la conexión de control. La orden puede tener un argumento que debe ser un nombre de orden y así devuelve información más específica como respuesta."
-        return command + "\n" + description
-        
-    def SITE():
-        command = "PARAMETROS DEL SISTEMA (SITE)"
-        description = "Not Implemented"
-        #description = "Esta orden la usa el servidor para proporcionar servicios específicos propios de su sistema que son fundamentales para transferir ficheros pero no lo suficientemente universales como para ser incluídos como órdenes en el protocolo. La naturaleza de este servicio y la especificación de su sintaxis se puede obtener como respuesta a una orden HELP SITE."
         return command + "\n" + description
         
     def NOOP():
