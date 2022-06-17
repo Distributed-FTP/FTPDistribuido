@@ -152,7 +152,7 @@ class Node:
               s.connect((IpDnodo, HOSTPORT))
               
               s.sendall(b"{}".__format__(self.listaDNodos[self._ultimoidAsignado-1]))
-              if count<len(self.listaDNodos)-1:
+              if self._ultimoidAsignado<len(self.listaDNodos)-1:
                 s.sendall(b"{}".__format__(self.listaDNodos[self._ultimoidAsignado+1]))
               else:
                 s.sendall(b"{}".__format__(self.listaDNodos[0]))
