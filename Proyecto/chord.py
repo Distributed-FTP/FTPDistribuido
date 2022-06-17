@@ -46,10 +46,9 @@ class Node:
         self.fingertable=None
         self._soyLider=False
         self._ultimoidAsignado=0
-        #Esta lista es para guardar la relacion IP : Id de los nodos del sistema
         self.listaDNodos=[]  
         #Todo Nodo debe saber si es el lider , en caso de que lo sea debe realizar acciones especificas
-       # self.fingertable = {((self._id+(i**2))%2**160) : self._ip for i in range(160)} #!ID:IP
+        # self.fingertable = {((self._id+(i**2))%2**160) : self._ip for i in range(160)} #!ID:IP
 
 
     def start_comunication(self):
@@ -81,9 +80,6 @@ class Node:
                  print('[*] Datos recibidos: {}'.format(data.decode('utf-8'))) 
                  conn.send(b'{}'.__format__(self._id)) # Hacemos echo convirtiendo de nuevo a bytes
                  self.listaDNodos.append("{}".format(addr[0]))
-                 #list=json.dumps(listaDNodos)
-                 #list=list.encode()
-                 #self.server.send(list)
                 #else:
                 conn.close()
                 #ahora asignamos los sucesores , predecesores y fingertables
@@ -126,6 +122,9 @@ class Node:
               datasucesor = conn.recv(BUFFER_SIZE)
               ipsucesor=datasucesor.decode('utf-8')
               self._sucesor=ipsucesor
+              data=conn.recv(1024)
+              ipdnodos=data.decode()
+              listaDNodos=json.loads(ipdnodos)
 
           #threading.Thread(target=self.listenThread, args=()).start()
           #threading.Thread(target=self.fix_fingers, args=()).start()
@@ -158,6 +157,13 @@ class Node:
                 s.sendall(b"{}".__format__(self.listaDNodos[0]))
               s.close()
           self._ultimoidAsignado+=1
+        
+
+    def pasarInfoDlider(self):
+        for ipnodo in self.listaDNodos:
+            data=json.dumps(self.listaDNodos)
+            listadIps=data.encode()
+            self.server.send(listadIps)     
 
 if __name__ == '__main__':
  nombre_equipo = socket.gethostname()
