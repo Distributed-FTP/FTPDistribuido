@@ -2,12 +2,12 @@
 from uuid import getnode as get_mac
 import sys,subprocess
 import os
-#import nis as ni
 import socket
 from matplotlib.pyplot import get
 import json
+import threading
 
- 
+
 #Si el nodo i de la red esta activo se guarda True, esta lista servira para comprobar constantemente 
 # si un nodo se desactivo o si un nodo se activo
 controlDNodos=[]
@@ -16,8 +16,8 @@ controlDNodos=[]
 #los nodos
 estadoDChord=None
 
-#Esta lista es para guardar los IP de los nodos del sistema en el orden en que se van ordenando por ids
-listaDNodos=[]
+#Esta lista es para guardar la relacion IP : Id de los nodos del sistema
+
 
 def BuscaNodosEnRed():
  if len(sys.argv)!=2:
@@ -35,8 +35,6 @@ def BuscaNodosEnRed():
              if out != '':
                  sys.stdout.write(out)
                  sys.stdout.flush()
-   
-BuscaNodosEnRed()
 
 class Node:
     def __init__(self,ip):
@@ -46,7 +44,11 @@ class Node:
         self._predecesor=None
         self._sucesor=None
         self.fingertable=None
-        self._soyLider=False  #Todo Nodo debe saber si es el lider , en caso de que lo sea debe realizar acciones especificas
+        self._soyLider=False
+        self._ultimoidAsignado=0
+        #Esta lista es para guardar la relacion IP : Id de los nodos del sistema
+        self.listaDNodos=[]  
+        #Todo Nodo debe saber si es el lider , en caso de que lo sea debe realizar acciones especificas
        # self.fingertable = {((self._id+(i**2))%2**160) : self._ip for i in range(160)} #!ID:IP
 
 
@@ -57,17 +59,16 @@ class Node:
         try:
             self._soyLider=True
             self.id=0
-            listaDNodos.append("{}:{}".format(self._ip,0))
-            NodosEnElsistema=1
+            self.listaDNodos.append("{}".format(self._ip))
+            ultimoIdAsignado=0
             BUFFER_SIZE=1024
             self.server = socket.socket(
                 socket.AF_INET, socket.SOCK_STREAM)
             self.server.bind((self._ip,12345))
-            self.server.listen(1000) 
+            self.server.listen(10000)
             #self.server.settimeout(1000)
             conn, addr = self.server.accept() # Establecemos la conexión con el cliente 
             if conn: 
-
               while True:
             # Recibimos bytes, convertimos en str
                data = conn.recv(BUFFER_SIZE)
@@ -75,16 +76,20 @@ class Node:
                if not data:
                 break
                else:
-                #if data.decode('utf-8')=="Soy Nodo FTP":
+                if data.decode('utf-8')=="Nodo Soy FTP":
                  print(data)
                  print('[*] Datos recibidos: {}'.format(data.decode('utf-8'))) 
-                 conn.send(b"idpredecesor") # Hacemos echo convirtiendo de nuevo a bytes
-                 listaDNodos.append("{}:{}".format(addr[0],NodosEnElsistema))
+                 conn.send(b'{}'.__format__(self._id)) # Hacemos echo convirtiendo de nuevo a bytes
+                 self.listaDNodos.append("{}".format(addr[0]))
                  #list=json.dumps(listaDNodos)
                  #list=list.encode()
                  #self.server.send(list)
                 #else:
-                 #  conn.close()
+                conn.close()
+                #ahora asignamos los sucesores , predecesores y fingertables
+                self.completar_nodos()
+                self.pasarInfoDlider() 
+
 
 
         except socket.error:
@@ -92,7 +97,7 @@ class Node:
             return
         
        #else:
-        SERVER_HOST = "DESKTOP-P0GKUJT"
+        SERVER_HOST = None
         SERVER_PORT = 12345
 
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -101,46 +106,64 @@ class Node:
           #nombre_d_equipo=socket.gethostname()
           #ip=socket.gethostbyname(nombre_d_equipo)
 
-          s.send(b"Soy Nodo FTP")
+          s.send(b"Nodo Soy FTP")
           #s.send(b"{}".__format__(ip))
           data = s.recv(1024)
-          decodificado=data.decode()
+          iddecodificado=data.decode()
+          
+          self._id=iddecodificado
+          
+          self.server = socket.socket(
+               socket.AF_INET, socket.SOCK_STREAM)
+          
+          self.server.bind((self._ip,SERVER_PORT))
+          self.server.listen(10000)
+          conn, addr = self.server.accept() # Establecemos la conexión con el cliente
+          with conn:
+              datapredecesor = conn.recv(BUFFER_SIZE)
+              ippredecesor=datapredecesor.decode('utf-8')
+              self._predecesor=ippredecesor
+              datasucesor = conn.recv(BUFFER_SIZE)
+              ipsucesor=datasucesor.decode('utf-8')
+              self._sucesor=ipsucesor
+
+          #threading.Thread(target=self.listenThread, args=()).start()
+          #threading.Thread(target=self.fix_fingers, args=()).start()
+          #threading.Thread(target=self.stabilize, args=()).start()
+          #threading.Thread(target=self.update_successors, args=()).start()
+          
           #nodo=Node(int(decodificado[13:len(decodificado)-1])+1)
           #data=s.recv(1024)
           #data=data.decode()
           #listaDNodos=json.loads(data)
           
 
+    def completar_nodos(self):
+        HOSTPORT=12345
+        
+        for IpDnodo in self.listaDNodos:
+          if self._ultimoidAsignado==0:
+            self._predecesor=self.listaDNodos[len(self.listaDNodos)-1]
+            if self._ultimoidAsignado+1<len(self.listaDNodos):
+                self._sucesor=self.listaDNodos[self._ultimoidAsignado+1]
+          else: 
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
 
-
-
-
-
+              s.connect((IpDnodo, HOSTPORT))
+              
+              s.sendall(b"{}".__format__(self.listaDNodos[self._ultimoidAsignado-1]))
+              if self._ultimoidAsignado<len(self.listaDNodos)-1:
+                s.sendall(b"{}".__format__(self.listaDNodos[self._ultimoidAsignado+1]))
+              else:
+                s.sendall(b"{}".__format__(self.listaDNodos[0]))
+              s.close()
+          self._ultimoidAsignado+=1
 
 if __name__ == '__main__':
- ID_equipo=0
  nombre_equipo = socket.gethostname()
  direccionIP_equipo = socket.gethostbyname(nombre_equipo)
  nodo=Node(direccionIP_equipo)
  nodo.start_comunication()
-
-#def createNodes():
- #   i =0 
-  #  nuevonodo=Node("127.70.30.{}".format(i),i)
-   # listaDNodos.append(nuevonodo)
-   # controlDNodos.append(True)
-   # i+=1
-   # while i<64:
-   #     nuevonodo=Node("127.70.30.{}".format(i),i)
-   #    if i<=63 :
-   #      listaDNodos[i-1]._sucesor=nuevonodo
-   #      listaDNodos.append(nuevonodo)
-   ##      controlDNodos.append(True)
-    #     nuevonodo._predecesor=listaDNodos[i-1]
-    #listaDNodos[63]._sucesor=listaDNodos[0]
-    #listaDNodos[0]._predecesor=listaDNodos[63]
-
-#def updatefingertables()
  
 
 def join(id):
@@ -171,26 +194,6 @@ def leave(id):
     controlDNodos[id]=False
     listaDNodos[id]._sucesor._keys.extend(listaDNodos[id]._keys)
     #updatefingertables(id)
-
-Nodo= Node()
-
-#def DameIP():
-   #     interfaces = ni.interfaces()
-   #     if 'eth0' in interfaces: #LAN
-    #        return ni.ifaddresses('eth0')[2][0]['addr']
-   #     elif 'enp0s31f6' in interfaces: #WIFI
-   #         return ni.ifaddresses('enp0s31f6')[2][0]['addr']
-    #    else:
-   #         ni.ifaddresses(interfaces[0])[2][0]['addr']
-
-#def ObtenerID(self):
- #       mac = get_mac() #Retorna la direccion mac como entero de 48 bits
-  #      My_id = str(mac).join(random.choice(string.ascii_lowercase + string.ascii_uppercase + string.digits)
-   #                         for x in range(30))
-    #    sha = hashlib.sha1()
-     #   sha.update(My_id.encode('ascii'))
-      #  self.MyId = int(sha.hexdigest() ,16)
-       # return  int(sha.hexdigest() ,16)
 
 
 
