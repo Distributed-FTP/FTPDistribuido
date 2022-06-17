@@ -826,14 +826,10 @@ class ServerFTP(Thread):
                 self.__send_control(Return_Codes.Code_211(Help_Commands.USER()).encode())
             elif "PASS" in cmd:
                 self.__send_control(Return_Codes.Code_211(Help_Commands.PASS()).encode())
-            elif "ACCT" in cmd:
-                self.__send_control(Return_Codes.Code_211(Help_Commands.ACCT()).encode())
             elif "CWD" in cmd:
                 self.__send_control(Return_Codes.Code_211(Help_Commands.CWD()).encode())
             elif "CDUP" in cmd:
                 self.__send_control(Return_Codes.Code_211(Help_Commands.CDUP()).encode())
-            elif "SMNT" in cmd:
-                self.__send_control(Return_Codes.Code_211(Help_Commands.SMNT()).encode())
             
             #Logout
             elif "REIN" in cmd:
@@ -854,10 +850,6 @@ class ServerFTP(Thread):
                 self.__send_control(Return_Codes.Code_211(Help_Commands.STRU()).encode())
 
             #File action commands
-            elif "ALLO" in cmd:
-                self.__send_control(Return_Codes.Code_211(Help_Commands.ALLO()).encode())
-            elif "REST" in cmd:
-                self.__send_control(Return_Codes.Code_211(Help_Commands.REST()).encode())
             elif "STOR" in cmd:
                 self.__send_control(Return_Codes.Code_211(Help_Commands.STOR()).encode())
             elif "STOU" in cmd:
@@ -882,20 +874,14 @@ class ServerFTP(Thread):
                 self.__send_control(Return_Codes.Code_211(Help_Commands.MKD()).encode())
             elif "PWD" in cmd:
                 self.__send_control(Return_Codes.Code_211(Help_Commands.PWD()).encode())
-            elif "ABOR" in cmd:
-                self.__send_control(Return_Codes.Code_211(Help_Commands.ABOR()).encode())
 
             #Informational commands
             elif "SYST" in cmd:
                 self.__send_control(Return_Codes.Code_211(Help_Commands.SYST()).encode())
-            elif "STAT" in cmd:
-                self.__send_control(Return_Codes.Code_211(Help_Commands.STAT()).encode())
             elif "HELP" in cmd:
                 self.__send_control(Return_Codes.Code_211(Help_Commands.HELP()).encode())
 
             #Miscellaneous commands
-            elif "SITE" in cmd:
-                self.__send_control(Return_Codes.Code_211(Help_Commands.SITE()).encode())
             elif "NOOP" in cmd:
                 self.__send_control(Return_Codes.Code_211(Help_Commands.NOOP()).encode())
             else:
