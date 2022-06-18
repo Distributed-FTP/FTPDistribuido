@@ -43,7 +43,7 @@ class Node:
         self._keys=list()  #Para cada nodo hay que saber las llaves que tiene asociadas en cada momento
         self._predecesor=None
         self._sucesor=None
-        self.fingertable=None
+        self.fingertable=dict()
         self._soyLider=False
         self._ultimoidAsignado=0
         self.listaDNodos=[]  
@@ -59,6 +59,7 @@ class Node:
             self._soyLider=True
             self.id=0
             self.listaDNodos.append("{}".format(self._ip))
+            controlDNodos.append(True)
             ultimoIdAsignado=0
             BUFFER_SIZE=1024
             self.server = socket.socket(
@@ -83,6 +84,7 @@ class Node:
                 #else:
                 conn.close()
                 #ahora asignamos los sucesores , predecesores y fingertables
+                self.creaFingertable()
                 self.completar_nodos()
                 self.pasarInfoDlider() 
 
@@ -125,17 +127,30 @@ class Node:
               data=conn.recv(1024)
               ipdnodos=data.decode()
               listaDNodos=json.loads(ipdnodos)
+          self.creaFingertable()
+          
+        print("Sistema listo para Comenzar")
+        self.run()
 
-          #threading.Thread(target=self.listenThread, args=()).start()
-          #threading.Thread(target=self.fix_fingers, args=()).start()
-          #threading.Thread(target=self.stabilize, args=()).start()
-          #threading.Thread(target=self.update_successors, args=()).start()
+          
           
           #nodo=Node(int(decodificado[13:len(decodificado)-1])+1)
           #data=s.recv(1024)
           #data=data.decode()
           #listaDNodos=json.loads(data)
           
+    def creaFingertable(self):
+         for i in range(8):
+            key=self._id+pow(2,i)
+            self.fingertable.setdefault(key,key)
+
+    def run(self):
+         if self._soyLider
+          
+          threading.Thread(target=self.listenThread, args=()).start()
+          threading.Thread(target=self.fix_fingers, args=()).start()
+          threading.Thread(target=self.stabilize, args=()).start()
+          threading.Thread(target=self.update_successors, args=()).start()
 
     def completar_nodos(self):
         HOSTPORT=12345
@@ -156,7 +171,9 @@ class Node:
               else:
                 s.sendall(b"{}".__format__(self.listaDNodos[0]))
               s.close()
+          controlDNodos.append(True)
           self._ultimoidAsignado+=1
+
         
 
     def pasarInfoDlider(self):
@@ -204,11 +221,11 @@ def join(id):
   #updatefingertables(id)
   
 
-def leave(id):
-    listaDNodos[id]._predecesor._sucesor=listaDNodos[id]._sucesor
-    listaDNodos[id]._sucesor._predecesor=listaDNodos[id]._predecesor
-    controlDNodos[id]=False
-    listaDNodos[id]._sucesor._keys.extend(listaDNodos[id]._keys)
+#def leave(id):
+ #   listaDNodos[id]._predecesor._sucesor=listaDNodos[id]._sucesor
+  #  listaDNodos[id]._sucesor._predecesor=listaDNodos[id]._predecesor
+   # controlDNodos[id]=False
+   # listaDNodos[id]._sucesor._keys.extend(listaDNodos[id]._keys)
     #updatefingertables(id)
 
 
