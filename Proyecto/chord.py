@@ -160,10 +160,20 @@ class Node:
         
 
     def pasarInfoDlider(self):
-        for ipnodo in self.listaDNodos:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+
+         HOSTPORT=12345   
+         count=0
+        
+         for ipnodo in self.listaDNodos:
+            if count==0:
+                continue
+            s.connect((ipnodo, HOSTPORT))
             data=json.dumps(self.listaDNodos)
             listadIps=data.encode()
-            self.server.send(listadIps)     
+            s.send(listadIps)
+            s.close()
+            count+=1     
 
 if __name__ == '__main__':
  nombre_equipo = socket.gethostname()
