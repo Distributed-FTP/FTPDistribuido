@@ -266,7 +266,8 @@ class Node:
           controlDNodos.append(True)
           self._ultimoidAsignado+=1
 
-        
+    def buscaNuevosNodos():
+          
 
     def pasarInfoDlider(self):
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -286,11 +287,11 @@ class Node:
 
     def join(id):
       
-    #def leave(id):
- #   listaDNodos[id]._predecesor._sucesor=listaDNodos[id]._sucesor
-  #  listaDNodos[id]._sucesor._predecesor=listaDNodos[id]._predecesor
-   # controlDNodos[id]=False
-   # listaDNodos[id]._sucesor._keys.extend(listaDNodos[id]._keys)
+    def leave(id):
+     listaDNodos[id]._predecesor._sucesor=listaDNodos[id]._sucesor
+     listaDNodos[id]._sucesor._predecesor=listaDNodos[id]._predecesor
+     controlDNodos[id]=False
+     listaDNodos[id]._sucesor._keys.extend(listaDNodos[id]._keys)
     #updatefingertables(id)
 
 if __name__ == '__main__':
