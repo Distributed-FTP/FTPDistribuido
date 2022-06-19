@@ -1,4 +1,5 @@
 #from typing_extensions import Self
+from base64 import encode
 from uuid import getnode as get_mac
 import sys,subprocess
 import os
@@ -46,7 +47,9 @@ class Node:
         self.fingertable=dict()
         self._soyLider=False
         self._ultimoidAsignado=0
-        self.listaDNodos=[]  
+        self.listaDNodos=[]
+        
+          
         #Todo Nodo debe saber si es el lider , en caso de que lo sea debe realizar acciones especificas
         # self.fingertable = {((self._id+(i**2))%2**160) : self._ip for i in range(160)} #!ID:IP
 
@@ -57,7 +60,7 @@ class Node:
 
         try:
             self._soyLider=True
-            self.id=0
+            self._id="0"
             self.listaDNodos.append("{}".format(self._ip))
             controlDNodos.append(True)
             ultimoIdAsignado=0
@@ -66,27 +69,32 @@ class Node:
                 socket.AF_INET, socket.SOCK_STREAM)
             self.server.bind((self._ip,12345))
             self.server.listen(10000)
+            self.server.settimeout(15000)
             #self.server.settimeout(1000)
             conn, addr = self.server.accept() # Establecemos la conexión con el cliente 
             if conn: 
               while True:
+                
             # Recibimos bytes, convertimos en str
                data = conn.recv(BUFFER_SIZE)
             # Verificamos que hemos recibido datos
-               if not data:
-                break
-               else:
-                if data.decode('utf-8')=="Nodo Soy FTP":
+               #if not data:
+               # break
+               #else:
+               if data.decode('utf-8')=="Nodo Soy FTP":
                  print(data)
                  print('[*] Datos recibidos: {}'.format(data.decode('utf-8'))) 
-                 conn.send(b'{}'.__format__(self._id)) # Hacemos echo convirtiendo de nuevo a bytes
+                 conn.send(bytes(str(self._id),'utf8')) # Hacemos echo convirtiendo de nuevo a bytes
                  self.listaDNodos.append("{}".format(addr[0]))
+                 conn.close()
                 #else:
-                conn.close()
+               conn.settimeout(10000)
+               conn,addr = self.server.accept() # Establecemos la conexión con el cliente
+                
                 #ahora asignamos los sucesores , predecesores y fingertables
-                self.creaFingertable()
-                self.completar_nodos()
-                self.pasarInfoDlider() 
+              self.creaFingertable()
+              self.completar_nodos()
+              self.pasarInfoDlider() 
 
 
 
@@ -132,8 +140,6 @@ class Node:
         print("Sistema listo para Comenzar")
         self.run()
 
-          
-          
           #nodo=Node(int(decodificado[13:len(decodificado)-1])+1)
           #data=s.recv(1024)
           #data=data.decode()
@@ -144,14 +150,46 @@ class Node:
             key=self._id+pow(2,i)
             self.fingertable.setdefault(key,key)
 
-    def run(self):
-         if self._soyLider
+    def run(self): 
+      SERVER_HOST = None
+      SERVER_PORT = 8001
+      
+      if not self._soyLider:
+         threading.Thread(target=self.quienEsEllider, args=()).start()
+      else:
+         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
           
-          threading.Thread(target=self.listenThread, args=()).start()
-          threading.Thread(target=self.fix_fingers, args=()).start()
-          threading.Thread(target=self.stabilize, args=()).start()
-          threading.Thread(target=self.update_successors, args=()).start()
+          for SERVERHOST in self.listaDNodos:
+           
+           s.connect((SERVER_HOST, SERVER_PORT))
+           s.send(b"{}".__format__(encode(SERVER_HOST)))
+           s.close()
 
+         threading.Thread(target=self.buscaLider, args=()).start()
+         threading.Thread(target=self.stabilize, args=()).start()
+         #threading.Thread(target=self.listenThread, args=()).start()
+         #if self._soyLider
+          #print("ya")
+         
+         # threading.Thread(target=self.fix_fingers, args=()).start()
+         
+         # threading.Thread(target=self.update_successors, args=()).start()
+
+    def quienEsEllider(self):
+          SERVER_PORT=8000
+          self.server = socket.socket(
+               socket.AF_INET, socket.SOCK_STREAM)
+          
+          self.server.bind((self._ip,SERVER_PORT))
+          self.server.listen()
+          
+
+    def stabilize(self):  #Metodo para que el lider identifique nodos nuevos que quieran conectarse o para reconectar a alguno que estaba inactivo
+            if self._predecesor
+
+    def buscalider(self):
+         
+    
     def completar_nodos(self):
         HOSTPORT=12345
         
