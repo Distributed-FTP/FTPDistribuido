@@ -1,6 +1,8 @@
 #from typing_extensions import Self
 from base64 import encode
 from copyreg import constructor
+from itertools import count
+from pickle import TRUE
 from uuid import getnode as get_mac
 import sys,subprocess
 import os
@@ -13,7 +15,7 @@ import threading
 #Si el nodo i de la red esta activo se guarda True, esta lista servira para comprobar constantemente 
 # si un nodo se desactivo o si un nodo se activo
 controlDNodos=[]
-
+hayLider=False
 #esta variable es para saber el estado en que se encuentra chord , si buscando un elemento , si anadiendo un elemento o si esta reorganizando
 #los nodos
 estadoDChord=None
@@ -163,20 +165,12 @@ class Node:
          
          if not ping(self._ipLider):
 
+          hayLider=False
           self.seleccionalider()
-          
-          self.server = socket.socket(
-               socket.AF_INET, socket.SOCK_STREAM)
-          
-          self.server.bind((self._ip,SERVER_PORT))
-          self.server.listen()
-          conn, addr = self.server.accept() # Establecemos la conexión con el cliente
-          data=conn.recv(1024)
-          self._ipLider=data.decode()
+          threading.Thread(target=self.esperaActualizacionDlider, args=()).start()
 
-
-         threading.Thread(target=self.buscaLider, args=()).start()
-         threading.Thread(target=self.stabilize, args=()).start()
+         #threading.Thread(target=self.buscaLider, args=()).start()
+         #threading.Thread(target=self.stabilize, args=()).start()
          #threading.Thread(target=self.listenThread, args=()).start()
          #if self._soyLider
           #print("ya")
@@ -184,6 +178,24 @@ class Node:
          # threading.Thread(target=self.fix_fingers, args=()).start()
          
          # threading.Thread(target=self.update_successors, args=()).start()
+    
+    def esperaActualizacionDlider(self):
+          SERVER_PORT = 8002
+
+          self.server = socket.socket(
+               socket.AF_INET, socket.SOCK_STREAM)
+          
+          self.server.bind((self._ip,SERVER_PORT))
+          self.server.listen()
+          while not hayLider:
+           conn, addr = self.server.accept() # Establecemos la conexión con el cliente
+           if conn:
+            data=conn.recv(1024)
+            if data.decode()=="Soy lider d nodos":
+                hayLider=True
+                self._ipLider=addr[0]     
+           conn.close()       
+            
 
     def actualizaNodoLider(self):
       
@@ -198,8 +210,24 @@ class Node:
           idnodo+=1
 
     def seleccionalider(self):
-         id = self._id
-         
+         SERVER_PORT=8002
+         countpos=0
+
+         for ipnodo in self.listaDNodos:
+            if ipnodo==self._ip:
+                countpos+=1
+                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                 while countpos<len(self.listaDNodos):
+
+                   s.connect((self.listaDNodos[countpos], SERVER_PORT))
+                   s.send(b"Soy lider d nodos")
+                   s.close()
+                   countpos+=1
+
+            elif ping(ipnodo):
+                break
+            countpos+=1
+                      
 
     def stabilize(self):  #Metodo para que el lider identifique nodos nuevos que quieran conectarse o para reconectar a alguno que estaba inactivo
             idnodo=0
@@ -213,7 +241,7 @@ class Node:
                     
               idnodo+=1
 
-    def buscalider(self):
+    
          
     
     def completar_nodos(self):
@@ -256,41 +284,25 @@ class Node:
             s.close()
             count+=1     
 
-if __name__ == '__main__':
- nombre_equipo = socket.gethostname()
- direccionIP_equipo = socket.gethostbyname(nombre_equipo)
- nodo=Node(direccionIP_equipo)
- nodo.start_comunication()
- 
-
-def join(id):
-  controlDNodos[id]=True
-  i=id
-  i+=1
-  while not controlDNodos[i]:
-      i+=1
-      if i==64:
-          i=0
-
-  controlDNodos[id]._sucesor=controlDNodos[id]
-  i=id
-  i-=1
-  while not controlDNodos[i]:
-      i-=1
-      if i==0:
-          i=64
-    
-  controlDNodos[id]._predecesor=controlDNodos[i]
-  
-  #updatefingertables(id)
-  
-
-#def leave(id):
+    def join(id):
+      
+    #def leave(id):
  #   listaDNodos[id]._predecesor._sucesor=listaDNodos[id]._sucesor
   #  listaDNodos[id]._sucesor._predecesor=listaDNodos[id]._predecesor
    # controlDNodos[id]=False
    # listaDNodos[id]._sucesor._keys.extend(listaDNodos[id]._keys)
     #updatefingertables(id)
+
+if __name__ == '__main__':
+ nombre_equipo = socket.gethostname()
+ direccionIP_equipo = socket.gethostbyname(nombre_equipo)
+ nodo=Node(direccionIP_equipo)
+ nodo.start_comunication()
+   
+  #updatefingertables(id)
+  
+
+
 
 
 
