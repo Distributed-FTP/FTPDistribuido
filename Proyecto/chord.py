@@ -1,5 +1,6 @@
 #from typing_extensions import Self
 from base64 import encode
+from copyreg import constructor
 from uuid import getnode as get_mac
 import sys,subprocess
 import os
@@ -20,7 +21,7 @@ estadoDChord=None
 #Esta lista es para guardar la relacion IP : Id de los nodos del sistema
 
 
-def BuscaNodosEnRed():
+def ping():
  if len(sys.argv)!=2:
      print("psweep.py 10.0.0")
  else:
@@ -45,10 +46,9 @@ class Node:
         self._predecesor=None
         self._sucesor=None
         self.fingertable=dict()
-        self._soyLider=False
+        self._ipLider=None
         self._ultimoidAsignado=0
         self.listaDNodos=[]
-        
           
         #Todo Nodo debe saber si es el lider , en caso de que lo sea debe realizar acciones especificas
         # self.fingertable = {((self._id+(i**2))%2**160) : self._ip for i in range(160)} #!ID:IP
@@ -59,7 +59,7 @@ class Node:
        #if mac=='94-E2-3C-07-91-08':
 
         try:
-            self._soyLider=True
+            self._ipLider=self._ip
             self._id="0"
             self.listaDNodos.append("{}".format(self._ip))
             controlDNodos.append(True)
@@ -152,18 +152,28 @@ class Node:
 
     def run(self): 
       SERVER_HOST = None
-      SERVER_PORT = 8001
+      SERVER_PORT = 8002
       
-      if not self._soyLider:
-         threading.Thread(target=self.quienEsEllider, args=()).start()
+      if self._ipLider==self._ip:
+         while self._ipLider==self._ip:
+          threading.Thread(target=self.actualizaNodoLider, args=()).start()
+          threading.Thread(target=self.stabilize, args=()).start()
+          threading.Thread(target=self.buscaNuevosNodos, args=()).start()
       else:
-         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+         
+         if not ping(self._ipLider):
+
+          self.seleccionalider()
           
-          for SERVERHOST in self.listaDNodos:
-           
-           s.connect((SERVER_HOST, SERVER_PORT))
-           s.send(b"{}".__format__(encode(SERVER_HOST)))
-           s.close()
+          self.server = socket.socket(
+               socket.AF_INET, socket.SOCK_STREAM)
+          
+          self.server.bind((self._ip,SERVER_PORT))
+          self.server.listen()
+          conn, addr = self.server.accept() # Establecemos la conexión con el cliente
+          data=conn.recv(1024)
+          self._ipLider=data.decode()
+
 
          threading.Thread(target=self.buscaLider, args=()).start()
          threading.Thread(target=self.stabilize, args=()).start()
@@ -175,17 +185,33 @@ class Node:
          
          # threading.Thread(target=self.update_successors, args=()).start()
 
-    def quienEsEllider(self):
-          SERVER_PORT=8000
-          self.server = socket.socket(
-               socket.AF_INET, socket.SOCK_STREAM)
-          
-          self.server.bind((self._ip,SERVER_PORT))
-          self.server.listen()
-          
+    def actualizaNodoLider(self):
+      
+       with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+         
+         idnodo=0
+         for nodoip in self.listaDNodos:
+          if controlDNodos[idnodo]:
+           s.connect((nodoip, 8002))
+           s.send(b"{}".__format__(encode(self._id)))
+           s.close()
+          idnodo+=1
+
+    def seleccionalider(self):
+         id = self._id
+         
 
     def stabilize(self):  #Metodo para que el lider identifique nodos nuevos que quieran conectarse o para reconectar a alguno que estaba inactivo
-            if self._predecesor
+            idnodo=0
+            for ipnodo in self.listaDNodos:
+              if ipnodo!=self._ip:
+                 if ping(ipnodo):
+                   if not controlDNodos[idnodo]:
+                      self.join(ipnodo,idnodo)
+                 elif controlDNodos[idnodo]:
+                     self.leave(ipnodo,idnodo)
+                    
+              idnodo+=1
 
     def buscalider(self):
          
