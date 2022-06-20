@@ -3,6 +3,7 @@ from base64 import encode
 from copyreg import constructor
 from itertools import count
 from pickle import TRUE
+from typing_extensions import Self
 from uuid import getnode as get_mac
 import sys,subprocess
 import os
@@ -23,22 +24,25 @@ estadoDChord=None
 #Esta lista es para guardar la relacion IP : Id de los nodos del sistema
 
 
-def ping():
+def ping(x):
  if len(sys.argv)!=2:
      print("psweep.py 10.0.0")
+     return False
  else:
      cmdping="ping -cl "+sys.argv[1]
 
-     for x in range (2,255):
-         p = subprocess.Popen(cmdping+str(x),shell=True,stderr=subprocess.PIPE)
+     
+     p = subprocess.Popen(cmdping+str(x),shell=True,stderr=subprocess.PIPE)
 
-         while True:
+     while True:
              out=p.stderr.read(1)
              if out=='' and p.poll()!=None:
                  break
              if out != '':
-                 sys.stdout.write(out)
-                 sys.stdout.flush()
+                 return True
+                 #sys.stdout.write(out)
+                 #sys.stdout.flush()
+ return False
 
 class Node:
     def __init__(self,ip):
@@ -266,8 +270,30 @@ class Node:
           controlDNodos.append(True)
           self._ultimoidAsignado+=1
 
-    def buscaNuevosNodos():
+    def buscaNuevosNodos(self):  #Falta completar el funcionamiento , que se una al sistema y que actualice a los otros nodos de la info del lider
+      nuevosnodos=[]
+      if len(sys.argv)!=2:
+          print("psweep.py 10.0.0")
           
+      else:
+       cmdping="ping -cl "+sys.argv[1]
+
+       for x in range(2,255):
+        p = subprocess.Popen(cmdping+str(x),shell=True,stderr=subprocess.PIPE)
+
+        while True:
+             out=p.stderr.read(1)
+             if out=='' and p.poll()!=None:
+                 break
+             if out != '':
+                 if self.listaDNodos.count(out)==0:
+                     nuevosnodos.append(out)
+                 #sys.stdout.write(out)
+                 #sys.stdout.flush()
+        
+             
+
+       
 
     def pasarInfoDlider(self):
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -285,14 +311,60 @@ class Node:
             s.close()
             count+=1     
 
-    def join(id):
-      
-    def leave(id):
-     listaDNodos[id]._predecesor._sucesor=listaDNodos[id]._sucesor
-     listaDNodos[id]._sucesor._predecesor=listaDNodos[id]._predecesor
+    def join(self,id,ip):
+        
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+         
+           try:
+            s.connect((ip, 8004))
+            s.send(b"soy el lider")
+            data=s.recv(1024)
+            if data.decode()=="Nodo Soy FTP":
+                
+                data=json.dumps(self.listaDNodos)
+                listadIps=data.encode()
+                s.send(listadIps)
+                if self.listaDNodos.count(ip)==0:
+                  s.send(b"eres nuevo")
+                else:
+                  s.send(b"no eres nuevo")
+
+            s.close()
+           except:
+            print("El nodo {} no es servidor".format(ip))
+
+    #def reajustarNodo():
+  
+
+    def leave(self,id):
      controlDNodos[id]=False
-     listaDNodos[id]._sucesor._keys.extend(listaDNodos[id]._keys)
+     ip_predecesor=get_predecesor(self.listaDNodos[id])
+     ip_sucesor=get_sucesor(self.listaDNodos[id])
+     nuevosucesor(self.listaDNodos[id])
+     
+    
     #updatefingertables(id)
+
+def get_predecesor(ip):
+     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            
+            s.connect((ip, 8005))
+            s.send(b"dime predecesor")
+            data=s.recv(1024)
+            s.close()
+            return data.decode()
+
+def get_sucesor(ip):
+     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            
+            s.connect((ip, 8005))
+            s.send(b"dime sucesor")
+            data=s.recv(1024)
+            s.close()
+            return data.decode()
+            
+            
+
 
 if __name__ == '__main__':
  nombre_equipo = socket.gethostname()
