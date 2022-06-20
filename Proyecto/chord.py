@@ -340,9 +340,8 @@ class Node:
      controlDNodos[id]=False
      ip_predecesor=get_predecesor(self.listaDNodos[id])
      ip_sucesor=get_sucesor(self.listaDNodos[id])
-     nuevosucesor(self.listaDNodos[id])
-     
-    
+     actualizasucesor(ip_predecesor,ip_sucesor)
+     actualizapredecesor(ip_sucesor,ip_predecesor)
     #updatefingertables(id)
 
 def get_predecesor(ip):
@@ -353,6 +352,24 @@ def get_predecesor(ip):
             data=s.recv(1024)
             s.close()
             return data.decode()
+
+def actualizasucesor(ip,nuevo_sucesor):
+          with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            
+            s.connect((ip, 8005))
+            s.send(b"actualiza sucesor")
+            
+            s.send(b'{}'.__format__(nuevo_sucesor.encode()))
+            s.close()
+            
+def actualizapredecesor(ip,nuevo_predecesor):
+          with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            
+            s.connect((ip, 8005))
+            s.send(b"actualiza predecesor")
+            
+            s.send(b'{}'.__format__(nuevo_predecesor.encode()))
+            s.close()
 
 def get_sucesor(ip):
      with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
