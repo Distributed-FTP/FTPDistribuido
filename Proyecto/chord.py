@@ -48,7 +48,8 @@ class Node:
     def __init__(self,ip):
         self._id=None
         self._ip=ip
-        self._keys=list()  #Para cada nodo hay que saber las llaves que tiene asociadas en cada momento
+        self._keys=dict() #cada llave de un archivo esta conformada por el id del nodo al que perteneces concatenado con una funcion hash , ya que pueden haber dos archivos con el mismo nombre y no ser el mismo.
+                         #por cada llave se guarda una lista con los id de los nodos en los que esta replicado el elemento
         self._predecesor=None
         self._sucesor=None
         self.fingertable=dict()
@@ -168,8 +169,6 @@ class Node:
       else:
          
          if not ping(self._ipLider):
-
-          hayLider=False
           self.seleccionalider()
           threading.Thread(target=self.esperaActualizacionDlider, args=()).start()
 
@@ -334,7 +333,7 @@ class Node:
             print("El nodo {} no es servidor".format(ip))
 
     #def reajustarNodo():
-  
+      
 
     def leave(self,id):
      controlDNodos[id]=False
@@ -342,7 +341,19 @@ class Node:
      ip_sucesor=get_sucesor(self.listaDNodos[id])
      actualizasucesor(ip_predecesor,ip_sucesor)
      actualizapredecesor(ip_sucesor,ip_predecesor)
-    #updatefingertables(id)
+     self.updatefingertables(id,ip_sucesor)
+     
+    def updatefingertables(self,id):
+         if id==0:
+          print("escribir aqui")
+         else:
+          with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.connect((self.listaDNodos[id], 8005))
+            s.send(b"soy el lider")
+            data=s.recv(1024)
+
+
+
 
 def get_predecesor(ip):
      with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -379,9 +390,7 @@ def get_sucesor(ip):
             data=s.recv(1024)
             s.close()
             return data.decode()
-            
-            
-
+           
 
 if __name__ == '__main__':
  nombre_equipo = socket.gethostname()
