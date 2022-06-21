@@ -19,7 +19,7 @@ import re
 # si un nodo se desactivo o si un nodo se activo
 controlDNodos=[]
 hayLider=False
-mac=True
+mac=False
 #esta variable es para saber el estado en que se encuentra chord , si buscando un elemento , si anadiendo un elemento o si esta reorganizando
 #los nodos
 estadoDChord=None
@@ -57,7 +57,6 @@ class Node:
         self._sucesor=None
         self.fingertable=dict()
         self._ipLider=None
-        self._ultimoidAsignado=0
         self.listaDNodos=[]
           
         #Todo Nodo debe saber si es el lider , en caso de que lo sea debe realizar acciones especificas
@@ -71,10 +70,9 @@ class Node:
         try:
             MinNodos=3   #esta variable solo es para saber el minimo de nodos que deben estar en el sistema para levantarlo en un principio 
             self._ipLider=self._ip
-            self._id="0"
+            self._id=0
             self.listaDNodos.append("{}".format(self._ip))
             controlDNodos.append(True)
-            ultimoIdAsignado=0
             BUFFER_SIZE=1024
             self.server = socket.socket(
                 socket.AF_INET, socket.SOCK_STREAM)
@@ -93,7 +91,7 @@ class Node:
                if data.decode('utf-8')=="Nodo Soy FTP":
                  print(data)
                  print('[*] Datos recibidos: {}'.format(data.decode('utf-8'))) 
-                 conn.send(bytes(str(self._id),'utf8')) # Hacemos echo convirtiendo de nuevo a bytes
+                 conn.send(bytes(str(len(self.listaDNodos)),'utf8')) # Hacemos echo convirtiendo de nuevo a bytes
                  self.listaDNodos.append("{}".format(addr[0]))
                  conn.close()
                  MinNodos-=1
@@ -112,7 +110,7 @@ class Node:
             return
         
        else:
-        SERVER_HOST = 
+        SERVER_HOST = 'DESKTOP-P0GKUJT'
         SERVER_PORT = 12345
 
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -123,27 +121,34 @@ class Node:
           s.send(b"Nodo Soy FTP")
           #s.send(b"{}".__format__(ip))
           data = s.recv(1024)
-          iddecodificado=data.decode('utf-8')
-          
-          self._id=iddecodificado
-          
-          self.server = socket.socket(
+          self._id=int(data.decode('utf-8'))
+          s.close()
+
+        SERVER_PORT= 8000  #Puerto para actualizar la informacion de los nodos al principio
+        self.server = socket.socket(
                socket.AF_INET, socket.SOCK_STREAM)
           
-          self.server.bind((self._ip,SERVER_PORT))
-          self.server.listen(10000)
-          conn, addr = self.server.accept() # Establecemos la conexión con el cliente
-          with conn:
+        self.server.bind((self._ip,SERVER_PORT))
+        self.server.listen()
+        conn, addr = self.server.accept() # Establecemos la conexión con el cliente
+        
+        with conn:
               datapredecesor = conn.recv(BUFFER_SIZE)
               ippredecesor=datapredecesor.decode('utf-8')
-              self._predecesor=ippredecesor
+              self._predecesor=int(ippredecesor)
               datasucesor = conn.recv(BUFFER_SIZE)
               ipsucesor=datasucesor.decode('utf-8')
-              self._sucesor=ipsucesor
+              self._sucesor=int(ipsucesor)
+              data=conn.recv(1024)
+              self._ipLider=data.decode('utf-8')
               data=conn.recv(1024)
               ipdnodos=data.decode('utf-8')
               listaDNodos=json.loads(ipdnodos)
-          self.creaFingertable()
+              data=conn.recv(1024)
+              NodosActivos=data.decode('utf-8')
+              listaDNodos=json.loads(NodosActivos)
+              conn.close()
+        self.creaFingertable()
           
         print("Sistema listo para Comenzar")
         self.run()
@@ -154,7 +159,7 @@ class Node:
           #listaDNodos=json.loads(data)
           
     def creaFingertable(self):
-         for i in range(8):
+         for i in range(6):
             key=self._id+pow(2,i)
             self.fingertable.setdefault(key,key)
 
@@ -250,27 +255,32 @@ class Node:
               idnodo+=1
     
     def completar_nodos(self):
-        HOSTPORT=12345
-        
-        for IpDnodo in self.listaDNodos:
-          if self._ultimoidAsignado==0:
-            self._predecesor=self.listaDNodos[len(self.listaDNodos)-1]
-            if self._ultimoidAsignado+1<len(self.listaDNodos):
-                self._sucesor=self.listaDNodos[self._ultimoidAsignado+1]
-          else: 
+            HOSTPORT=8000
+          #if len(self.listaDNodos)==1:
+            #self._predecesor=self.listaDNodos[len(self.listaDNodos)-1]
+            #if self._ultimoidAsignado+1<len(self.listaDNodos):
+           #     self._sucesor=self.listaDNodos[self._ultimoidAsignado+1]
+          #else: 
+            
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+              count=0
+              for IpDnodo in self.listaDNodos:
+               if count==0:
+                 self._predecesor=self.listaDNodos[len(self.listaDNodos)-1]
+                 self._sucesor=self.listaDNodos[count+1]
+                 self._ipLider=self._ip
+               else:
+                  s.connect((IpDnodo, HOSTPORT))
+                  s.sendall(b"{}".__format__(str(self.listaDNodos[count-1]).encode('utf-8')))
+                  if count<len(self.listaDNodos)-1:
+                    s.sendall(b"{}".__format__(str((count+1)).encode('utf-8')))
+                  else:
+                    s.sendall(b"{}".__format__(str(self.listaDNodos[0]).encode('utf-8')))
+                  s.close()
+                  controlDNodos.append(True)
 
-              s.connect((IpDnodo, HOSTPORT))
-              
-              s.sendall(b"{}".__format__(self.listaDNodos[self._ultimoidAsignado-1]))
-              if self._ultimoidAsignado<len(self.listaDNodos)-1:
-                s.sendall(b"{}".__format__(self.listaDNodos[self._ultimoidAsignado+1]))
-              else:
-                s.sendall(b"{}".__format__(self.listaDNodos[0]))
-              s.close()
-          controlDNodos.append(True)
-          self._ultimoidAsignado+=1
-
+               count+=1
+            
     def buscaNuevosNodos(self):  #Falta completar el funcionamiento , que se una al sistema y que actualice a los otros nodos de la info del lider
       nuevosnodos=[]
       if len(sys.argv)!=2:
@@ -295,7 +305,7 @@ class Node:
     def pasarInfoDlider(self):
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
 
-         HOSTPORT=12345   
+         HOSTPORT=8000   
          count=0
         
          for ipnodo in self.listaDNodos:
@@ -303,8 +313,11 @@ class Node:
                 continue
             s.connect((ipnodo, HOSTPORT))
             data=json.dumps(self.listaDNodos)
-            listadIps=data.encode()
+            listadIps=data.encode('utf-8')
             s.send(listadIps)
+            data=json.dumps(controlDNodos)
+            NodosActivos=data.encode('utf-8')
+            s.send(NodosActivos)
             s.close()
             count+=1     
 
