@@ -3,7 +3,8 @@ from base64 import encode
 from copyreg import constructor
 from itertools import count
 from pickle import TRUE
-from typing_extensions import Self
+from platform import mac_ver
+
 from uuid import getnode as get_mac
 import sys,subprocess
 import os
@@ -11,12 +12,14 @@ import socket
 from matplotlib.pyplot import get
 import json
 import threading
-
+from subprocess import Popen, PIPE 
+import re 
 
 #Si el nodo i de la red esta activo se guarda True, esta lista servira para comprobar constantemente 
 # si un nodo se desactivo o si un nodo se activo
 controlDNodos=[]
 hayLider=False
+mac=True
 #esta variable es para saber el estado en que se encuentra chord , si buscando un elemento , si anadiendo un elemento o si esta reorganizando
 #los nodos
 estadoDChord=None
@@ -63,9 +66,10 @@ class Node:
 
     def start_comunication(self):
 
-       #if mac=='94-E2-3C-07-91-08':
+       if mac:#self.macDNodo()=='94-E2-3C-07-91-08':
 
         try:
+            MinNodos=3   #esta variable solo es para saber el minimo de nodos que deben estar en el sistema para levantarlo en un principio 
             self._ipLider=self._ip
             self._id="0"
             self.listaDNodos.append("{}".format(self._ip))
@@ -75,42 +79,40 @@ class Node:
             self.server = socket.socket(
                 socket.AF_INET, socket.SOCK_STREAM)
             self.server.bind((self._ip,12345))
-            self.server.listen(10000)
-            self.server.settimeout(15000)
-            #self.server.settimeout(1000)
-            conn, addr = self.server.accept() # Establecemos la conexión con el cliente 
-            if conn: 
-              while True:
-                
+            self.server.listen()
+            while(MinNodos>0):
+             #self.server.settimeout(1000)
+             conn, addr = self.server.accept() # Establecemos la conexión con el cliente 
+             if conn:   
             # Recibimos bytes, convertimos en str
                data = conn.recv(BUFFER_SIZE)
             # Verificamos que hemos recibido datos
-               #if not data:
-               # break
-               #else:
+               if not data:
+                 continue
+               
                if data.decode('utf-8')=="Nodo Soy FTP":
                  print(data)
                  print('[*] Datos recibidos: {}'.format(data.decode('utf-8'))) 
                  conn.send(bytes(str(self._id),'utf8')) # Hacemos echo convirtiendo de nuevo a bytes
                  self.listaDNodos.append("{}".format(addr[0]))
                  conn.close()
-                #else:
-               conn.settimeout(10000)
-               conn,addr = self.server.accept() # Establecemos la conexión con el cliente
+                 MinNodos-=1
+               else:
+                continue
+                #conn.settimeout(10000)
+                #conn,addr = self.server.accept() # Establecemos la conexión con el cliente
                 
                 #ahora asignamos los sucesores , predecesores y fingertables
-              self.creaFingertable()
-              self.completar_nodos()
-              self.pasarInfoDlider() 
-
-
+            self.creaFingertable()
+            self.completar_nodos()
+            self.pasarInfoDlider() 
 
         except socket.error:
-           # prRed('Error abriendo socket')
+#           # prRed('Error abriendo socket') 
             return
         
-       #else:
-        SERVER_HOST = None
+       else:
+        SERVER_HOST = 
         SERVER_PORT = 12345
 
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -118,11 +120,10 @@ class Node:
           s.connect((SERVER_HOST, SERVER_PORT))
           #nombre_d_equipo=socket.gethostname()
           #ip=socket.gethostbyname(nombre_d_equipo)
-
           s.send(b"Nodo Soy FTP")
           #s.send(b"{}".__format__(ip))
           data = s.recv(1024)
-          iddecodificado=data.decode()
+          iddecodificado=data.decode('utf-8')
           
           self._id=iddecodificado
           
@@ -140,7 +141,7 @@ class Node:
               ipsucesor=datasucesor.decode('utf-8')
               self._sucesor=ipsucesor
               data=conn.recv(1024)
-              ipdnodos=data.decode()
+              ipdnodos=data.decode('utf-8')
               listaDNodos=json.loads(ipdnodos)
           self.creaFingertable()
           
@@ -157,6 +158,10 @@ class Node:
             key=self._id+pow(2,i)
             self.fingertable.setdefault(key,key)
 
+    def macDNodo(self):
+      mac= os.system('arp -n ' + str(self._ip))
+      return mac
+  
     def run(self): 
       SERVER_HOST = None
       SERVER_PORT = 8002
@@ -194,7 +199,7 @@ class Node:
            conn, addr = self.server.accept() # Establecemos la conexión con el cliente
            if conn:
             data=conn.recv(1024)
-            if data.decode()=="Soy lider d nodos":
+            if data.decode('utf-8')=="Soy lider d nodos":
                 hayLider=True
                 self._ipLider=addr[0]     
            conn.close()       
@@ -243,9 +248,6 @@ class Node:
                      self.leave(ipnodo,idnodo)
                     
               idnodo+=1
-
-    
-         
     
     def completar_nodos(self):
         HOSTPORT=12345
@@ -314,7 +316,7 @@ class Node:
             s.connect((ip, 8004))
             s.send(b"soy el lider")
             data=s.recv(1024)
-            if data.decode()=="Nodo Soy FTP":
+            if data.decode('utf-8')=="Nodo Soy FTP":
                 
                 data=json.dumps(self.listaDNodos)
                 listadIps=data.encode()
@@ -362,7 +364,7 @@ def get_predecesor(ip):
             s.send(b"dime predecesor")
             data=s.recv(1024)
             s.close()
-            return data.decode()
+            return data.decode('utf-8')
 
 def actualizasucesor(ip,nuevo_sucesor):
           with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -389,7 +391,7 @@ def get_sucesor(ip):
             s.send(b"dime sucesor")
             data=s.recv(1024)
             s.close()
-            return data.decode()
+            return data.decode('utf-8')
            
 
 if __name__ == '__main__':
