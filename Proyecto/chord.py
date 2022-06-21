@@ -18,8 +18,8 @@ import re
 #Si el nodo i de la red esta activo se guarda True, esta lista servira para comprobar constantemente 
 # si un nodo se desactivo o si un nodo se activo
 controlDNodos=[]
-hayLider=False
-mac=False
+
+mac=True
 #esta variable es para saber el estado en que se encuentra chord , si buscando un elemento , si anadiendo un elemento o si esta reorganizando
 #los nodos
 estadoDChord=None
@@ -57,6 +57,7 @@ class Node:
         self._sucesor=None
         self.fingertable=dict()
         self._ipLider=None
+        self.hayLider=False
         self.listaDNodos=[]
           
         #Todo Nodo debe saber si es el lider , en caso de que lo sea debe realizar acciones especificas
@@ -177,11 +178,10 @@ class Node:
           threading.Thread(target=self.stabilize, args=()).start()
           threading.Thread(target=self.buscaNuevosNodos, args=()).start()
       else:
-         
          if not ping(self._ipLider):
-          self.seleccionalider()
-          threading.Thread(target=self.esperaActualizacionDlider, args=()).start()
-
+          self.hayLider=False
+          threading.Thread(target=self.seleccionalider, args=()).start()
+          threading.Thread(target=self.esperaActualizacionDlider, args=()).start()         
          #threading.Thread(target=self.buscaLider, args=()).start()
          #threading.Thread(target=self.stabilize, args=()).start()
          #threading.Thread(target=self.listenThread, args=()).start()
@@ -200,13 +200,16 @@ class Node:
           
           self.server.bind((self._ip,SERVER_PORT))
           self.server.listen()
-          while not hayLider:
+          while not self.hayLider:
            conn, addr = self.server.accept() # Establecemos la conexión con el cliente
            if conn:
             data=conn.recv(1024)
             if data.decode('utf-8')=="Soy lider d nodos":
                 hayLider=True
-                self._ipLider=addr[0]     
+                self._ipLider=addr[0]
+            elif data.decode('utf-8')=="Eres el lider":
+                self._ipLider=self._ip
+                hayLider=True     
            conn.close()       
             
 
@@ -236,6 +239,9 @@ class Node:
                    s.send(b"Soy lider d nodos")
                    s.close()
                    countpos+=1
+                 s.connect((self._ip, SERVER_PORT))
+                 s.send(b"Eres el lider")
+                 s.close()
 
             elif ping(ipnodo):
                 break
