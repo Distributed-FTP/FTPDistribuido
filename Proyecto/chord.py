@@ -290,10 +290,6 @@ class Node:
                  #sys.stdout.write(out)
                  #sys.stdout.flush()
         
-             
-
-       
-
     def pasarInfoDlider(self):
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
 
@@ -341,19 +337,23 @@ class Node:
      ip_sucesor=get_sucesor(self.listaDNodos[id])
      actualizasucesor(ip_predecesor,ip_sucesor)
      actualizapredecesor(ip_sucesor,ip_predecesor)
-     self.updatefingertables(id,ip_sucesor)
+     self.updatefingertables(id,ip_sucesor,"leave")
      
-    def updatefingertables(self,id):
-         if id==0:
-          print("escribir aqui")
-         else:
+
+    def updatefingertables(self,id,evento):
           with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            s.connect((self.listaDNodos[id], 8005))
-            s.send(b"soy el lider")
-            data=s.recv(1024)
-
-
-
+           if evento=="leave":
+            while(id>=0) :
+             s.connect((self.listaDNodos[id], 8006))
+             s.send(b"leave {}".__format__(id.encode()))
+             s.close()
+             id-=1
+           else:
+             while(id>=0) :
+              s.connect((self.listaDNodos[id], 8006))
+              s.send(b"join {}".__format__(id.encode()))
+              s.close()
+              id-=1
 
 def get_predecesor(ip):
      with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -398,7 +398,7 @@ if __name__ == '__main__':
  nodo=Node(direccionIP_equipo)
  nodo.start_comunication()
    
-  #updatefingertables(id)
+  
   
 
 
