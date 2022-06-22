@@ -2,6 +2,7 @@
 from base64 import encode
 from copyreg import constructor
 from itertools import count
+from operator import truth
 from pickle import TRUE
 from platform import mac_ver
 
@@ -69,10 +70,10 @@ class Node:
        if mac:#self.macDNodo()=='94-E2-3C-07-91-08':
 
         try:
-            MinNodos=3   #esta variable solo es para saber el minimo de nodos que deben estar en el sistema para levantarlo en un principio 
+            MinNodos=1   #esta variable solo es para saber el minimo de nodos que deben estar en el sistema para levantarlo en un principio 
             self._ipLider=self._ip
             self._id=0
-            self.listaDNodos.append("{}".format(self._ip))
+            self.listaDNodos.append(self._ip)
             controlDNodos.append(True)
             BUFFER_SIZE=1024
             self.server = socket.socket(
@@ -93,7 +94,7 @@ class Node:
                  print(data)
                  print('[*] Datos recibidos: {}'.format(data.decode('utf-8'))) 
                  conn.send(bytes(str(len(self.listaDNodos)),'utf8')) # Hacemos echo convirtiendo de nuevo a bytes
-                 self.listaDNodos.append("{}".format(addr[0]))
+                 self.listaDNodos.append(addr[0])
                  conn.close()
                  MinNodos-=1
                else:
@@ -102,6 +103,7 @@ class Node:
                 #conn,addr = self.server.accept() # Establecemos la conexión con el cliente
                 
                 #ahora asignamos los sucesores , predecesores y fingertables
+            self.server.close()
             self.creaFingertable()
             self.completar_nodos()
             self.pasarInfoDlider() 
@@ -168,20 +170,30 @@ class Node:
       mac= os.system('arp -n ' + str(self._ip))
       return mac
   
-    def run(self): 
-      SERVER_HOST = None
-      SERVER_PORT = 8002
+    #def liderinactivo(self):
+         
+
+    def run(self):  ###Arreglar metodo , hay casos en los que un nodo puede dar ping y el servidor no estar levantado
       
+     while True:
+
       if self._ipLider==self._ip:
          while self._ipLider==self._ip:
-          threading.Thread(target=self.actualizaNodoLider, args=()).start()
-          threading.Thread(target=self.stabilize, args=()).start()
+          self.actualizaNodoLider()
+          self.stabilize()
           threading.Thread(target=self.buscaNuevosNodos, args=()).start()
       else:
-         if not ping(self._ipLider):
+         if not ping(self._ipLider) :
           self.hayLider=False
           threading.Thread(target=self.seleccionalider, args=()).start()
-          threading.Thread(target=self.esperaActualizacionDlider, args=()).start()         
+          threading.Thread(target=self.esperaActualizacionDlider, args=()).start()
+         if self._ipLider!=self._ip:
+          self.actividad()
+         #elif self.liderinactivo():
+                               
+         
+            #Antes de continuar todos tienen que saber quien es el lider 
+
          #threading.Thread(target=self.buscaLider, args=()).start()
          #threading.Thread(target=self.stabilize, args=()).start()
          #threading.Thread(target=self.listenThread, args=()).start()
@@ -214,16 +226,20 @@ class Node:
             
 
     def actualizaNodoLider(self):
-      
-       with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-         
+    
+       with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s: 
          idnodo=0
          for nodoip in self.listaDNodos:
-          if controlDNodos[idnodo]:
-           s.connect((nodoip, 8002))
-           s.send(b"{}".__format__(encode(self._id)))
-           s.close()
-          idnodo+=1
+          if nodoip!=self._ip:
+           if controlDNodos[idnodo]:
+            s.connect((nodoip, 8003))
+            s.send(b"Estas activo?")
+            data=s.recv(1024)
+            if data.decode('utf-8')!="estoy":
+                controlDNodos[idnodo]=False
+            s.close()
+
+           idnodo+=1
 
     def seleccionalider(self):
          SERVER_PORT=8002
@@ -247,8 +263,16 @@ class Node:
                 break
             countpos+=1
                       
+    def actividad(self):
+        server = socket.socket(
+                socket.AF_INET, socket.SOCK_STREAM)
+        server.bind((self._ip,8003))
+        server.listen()
+        conn, addr = self.server.accept()
+        
 
-    def stabilize(self):  #Metodo para que el lider identifique nodos nuevos que quieran conectarse o para reconectar a alguno que estaba inactivo
+
+    def stabilize(self):  #Metodo para que el lider identifique nodos que quieran reconectarse o para identificar alguno que estaba inactivo
             idnodo=0
             for ipnodo in self.listaDNodos:
               if ipnodo!=self._ip:
@@ -268,14 +292,16 @@ class Node:
            #     self._sucesor=self.listaDNodos[self._ultimoidAsignado+1]
           #else: 
             
-            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-              count=0
-              for IpDnodo in self.listaDNodos:
+            
+            count=0
+            for IpDnodo in self.listaDNodos:
                if count==0:
                  self._predecesor=self.listaDNodos[len(self.listaDNodos)-1]
                  self._sucesor=self.listaDNodos[count+1]
                  self._ipLider=self._ip
                else:
+                try:
+                 with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
                   s.connect((IpDnodo, HOSTPORT))
                   s.sendall(b"{}".__format__(str(self.listaDNodos[count-1]).encode('utf-8')))
                   if count<len(self.listaDNodos)-1:
@@ -284,7 +310,8 @@ class Node:
                     s.sendall(b"{}".__format__(str(self.listaDNodos[0]).encode('utf-8')))
                   s.close()
                   controlDNodos.append(True)
-
+                except:
+                  print("error")
                count+=1
             
     def buscaNuevosNodos(self):  #Falta completar el funcionamiento , que se una al sistema y que actualice a los otros nodos de la info del lider
