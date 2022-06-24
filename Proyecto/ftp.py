@@ -360,7 +360,8 @@ class ServerFTP(Thread):
             self.log.LogWarning(self.control_address[0], self.control_address[1], f"El servicio se reinicira en {time_stop} minutos.")
             time.sleep(time_stop * 60)
         except:
-            self.__send_control(Return_Codes.Code_220().encode() )
+            self.__send_control(Return_Codes.Code_220().encode())
+            self.log.LogOk(self.control_address[0], self.control_address[1], f"El servicio se reinicio.")
         
     def quit_command(self):
         self.__send_control(Return_Codes.Code_221().encode())
@@ -813,7 +814,7 @@ class ServerFTP(Thread):
     '''
     def syst_command(self):
         self.__send_control(Return_Codes.Code_215(sys.platform).encode())
-        self.log.LogError(self.control_address[0], self.control_address[1], f"El usuario {self.__user} solicito la informacion del sistema: {sys.platform}.")
+        self.log.LogOk(self.control_address[0], self.control_address[1], f"El usuario {self.__user} solicito la informacion del sistema: {sys.platform}.")
 
     def help_command(self, data):
         data_array = str(data).split(' ')
