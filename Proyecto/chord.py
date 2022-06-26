@@ -1,74 +1,35 @@
-#from typing_extensions import Self
-from base64 import encode
-from copyreg import constructor
-from itertools import count
-from operator import truth
-from pickle import TRUE
-from platform import mac_ver
 import os
 import csv
-from colorama import Fore
 import time
 import datetime
-import scapy as scapy
-from time import time
 from uuid import getnode as get_mac
 import sys,subprocess
 import os
 import socket
-from matplotlib import cm
-from matplotlib.pyplot import get
 import json
 import threading
 from subprocess import Popen, PIPE 
 import re
-
+import redis
 from setuptools import Command 
+from ping3 import ping
+
 
 #Si el nodo i de la red esta activo se guarda True, esta lista servira para comprobar constantemente 
 # si un nodo se desactivo o si un nodo se activo
 controlDNodos=[]
 SystemaEstable=True
-mac=True
+
 #esta variable es para saber el estado en que se encuentra chord , si buscando un elemento , si anadiendo un elemento o si esta reorganizando
 #los nodos
 estadoDChord=None
 
-#Esta lista es para guardar la relacion IP : Id de los nodos del sistema
-
-# Ahora vamos a construir una función que nos ayude a analizar la red wifi a la cual estamos conectados.
-def escanear(direccion_ip):
-    scapy.arping(direccion_ip)
-escanear("192.168.1.1/24")
-
 def check_ping(hostname):
-    response = os.system("FPING " + hostname )
-    if response == 0:
-        check_ping = "[OK]"
-    else:
-        check_ping = "[Error]"
- 
-    return check_ping
-
-def ping(x):
- if len(sys.argv)!=2:
-     print("psweep.py 10.0.0")
-     return False
- else:
-     cmdping="ping -cl "+sys.argv[1]
-
-     
-     p = subprocess.Popen(cmdping+str(x),shell=True,stderr=subprocess.PIPE)
-
-     while True:
-             out=p.stderr.read(1)
-             if out=='' and p.poll()!=None:
-                 break
-             if out != '':
-                 return True
-                 #sys.stdout.write(out)
-                 #sys.stdout.flush()
- return False
+  resp=ping(hostname)
+  if resp==False or resp==None:
+    return False
+  else:
+    return True
 
 class Node:
     def __init__(self,ip):
@@ -83,6 +44,8 @@ class Node:
         self.hayLider=False
         self.listaDNodos=[]
         self.peticiones=[]  # aqui se guardan las peticiones de los clientes
+       
+
         #Todo Nodo debe saber si es el lider , en caso de que lo sea debe realizar acciones especificas
         # self.fingertable = {((self._id+(i**2))%2**160) : self._ip for i in range(160)} #!ID:IP
 
@@ -93,6 +56,22 @@ class Node:
        #for peticion in self.peticiones:
         # if peticio
 
+
+    def procesapeticiones(self):
+      
+      while SystemaEstable :
+          peticion=self.procesapeticion()
+          if peticion=="subir":
+           threading.Thread(target=self.ejecutaSubida(), args=()).start()
+          if peticion=="descargar":
+           threading.Thread(target=self.ejecutaDescarga(), args=()).start()
+          if peticion=="editar":
+           threading.Thread(target=self.ejecutaEdicion(), args=()).start()
+          
+
+    #def procesapeticion(self):
+          
+
     def recepcionarpeticiones(self):
             servidor = socket.socket(
                 socket.AF_INET, socket.SOCK_STREAM)
@@ -100,15 +79,14 @@ class Node:
             servidor.listen()
             while True:
              conn, addr = servidor.accept() # Establecemos la conexión con el cliente
-             threading.Thread(target=self.procesapeticion(), args=()).start()
+             data=conn.recv(1024)
+             self._peticiones.append(data)
 
+       
     def start_comunication(self):
-
-       if mac:#self.macDNodo()=='94-E2-3C-07-91-08':
-
         try:
-            pin=check_ping("192.168.14.73")
-            MinNodos=1   #esta variable solo es para saber el minimo de nodos que deben estar en el sistema para levantarlo en un principio 
+            #pin=check_ping('192.168.128.254')
+            #MinNodos=1   #esta variable solo es para saber el minimo de nodos que deben estar en el sistema para levantarlo en un principio 
             self._ipLider=self._ip
             self._id=0
             self.listaDNodos.append(self._ip)
@@ -151,7 +129,7 @@ class Node:
 #           # prRed('Error abriendo socket') 
             return
         
-       else:
+       
         SERVER_HOST = 'DESKTOP-P0GKUJT'
         SERVER_PORT = 12345
 
@@ -218,20 +196,15 @@ class Node:
 
       if self._ipLider==self._ip:
          while self._ipLider==self._ip:
-          self.actualizaNodoLider()
           self.stabilize()
-          threading.Thread(target=self.buscaNuevosNodos, args=()).start()
-          
       else:
-         if not check_ping(self._ipLider) :
+         if not check_ping(self._ipLider):
           self.hayLider=False
-          threading.Thread(target=self.seleccionalider, args=()).start()
           threading.Thread(target=self.esperaActualizacionDlider, args=()).start()
+          threading.Thread(target=self.seleccionalider, args=()).start()
+          
          if self._ipLider!=self._ip:
           self.actividad()
-         
-
-         #elif self.liderinactivo():
                                
          
             #Antes de continuar todos tienen que saber quien es el lider 
@@ -266,22 +239,39 @@ class Node:
                 hayLider=True     
            conn.close()       
             
-
-    def actualizaNodoLider(self):
+    def stabilize(self):
     
+       ip=self._ip
+       while ip[len(ip)-1]!='.':
+          ip=ip[0:len(ip)-2]
+       
        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s: 
-         idnodo=0
-         for nodoip in self.listaDNodos:
-          if nodoip!=self._ip:
-           if controlDNodos[idnodo]:
-            s.connect((nodoip, 8003))
-            s.send(b"Estas activo?")
-            data=s.recv(1024)
-            if data.decode('utf-8')!="estoy":
-                controlDNodos[idnodo]=False
-            s.close()
-
-           idnodo+=1
+         for i in range(2,255):
+           if self._ip!= ip+str(i): 
+              if self.listaDNodos.count(ip+str(i))==1:
+                 try:
+                    s.connect((ip+str(i), 8003))
+                    s.send(b"Estas activo?")
+                    data=s.recv(1024)
+                    if data.decode('utf-8')=="estoy":
+                       continue
+                    else:
+                      self.leave(self.listaDNodos.index(ip+str(i)))
+                    s.close()
+                 except:
+                    self.leave(self.listaDNodos.index(ip+str(i)))                    
+              elif check_ping(ip+str(i)):
+                      try :
+                        s.connect(ip+str(i),8003)
+                        s.send(b"Estas activo?")
+                        data=s.recv(1024)
+                        if data.decode('utf-8')=="estoy":
+                            self.join(ip+str(i))
+                        s.close()
+                      except:
+                         s.close()
+                         continue
+              s.close()
 
     def seleccionalider(self):
          SERVER_PORT=8002
@@ -292,11 +282,14 @@ class Node:
                 countpos+=1
                 with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
                  while countpos<len(self.listaDNodos):
-
+                  try:
                    s.connect((self.listaDNodos[countpos], SERVER_PORT))
                    s.send(b"Soy lider d nodos")
                    s.close()
                    countpos+=1
+                  except:
+                     print("Hay que estabilizar antes de que sigan funcionando los demas nodos, hay al menos uno que se desconecto")
+                     
                  s.connect((self._ip, SERVER_PORT))
                  s.send(b"Eres el lider")
                  s.close()
@@ -304,27 +297,25 @@ class Node:
             elif check_ping(ipnodo):
                 break
             countpos+=1
-                      
+
+    def leave(self,id):
+     controlDNodos[id]=False
+     ip_predecesor=get_predecesor(self.listaDNodos[id])
+     ip_sucesor=get_sucesor(self.listaDNodos[id])
+     actualizasucesor(ip_predecesor,ip_sucesor)
+     actualizapredecesor(ip_sucesor,ip_predecesor)
+     #with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s: 
+      
+
+      #self.updatefingertables(id,ip_sucesor,"leave")
+
+
     def actividad(self):
         server = socket.socket(
                 socket.AF_INET, socket.SOCK_STREAM)
         server.bind((self._ip,8003))
         server.listen()
         conn, addr = self.server.accept()
-        
-
-
-    def stabilize(self):  #Metodo para que el lider identifique nodos que quieran reconectarse o para identificar alguno que estaba inactivo
-            idnodo=0
-            for ipnodo in self.listaDNodos:
-              if ipnodo!=self._ip:
-                 if check_ping(ipnodo):
-                   if not controlDNodos[idnodo]:
-                      self.join(ipnodo,idnodo)
-                 elif controlDNodos[idnodo]:
-                     self.leave(ipnodo,idnodo)
-                    
-              idnodo+=1
     
     def completar_nodos(self):
             HOSTPORT=8000
@@ -355,27 +346,6 @@ class Node:
                 except:
                   print("error")
                count+=1
-            
-    def buscaNuevosNodos(self):  #Falta completar el funcionamiento , que se una al sistema y que actualice a los otros nodos de la info del lider
-      nuevosnodos=[]
-      if len(sys.argv)!=2:
-          print("psweep.py 10.0.0")
-          
-      else:
-       cmdping="ping -cl "+sys.argv[1]
-
-       for x in range(2,255):
-        p = subprocess.Popen(cmdping+str(x),shell=True,stderr=subprocess.PIPE)
-
-        while True:
-             out=p.stderr.read(1)
-             if out=='' and p.poll()!=None:
-                 break
-             if out != '':
-                 if self.listaDNodos.count(out)==0:
-                     nuevosnodos.append(out)
-                 #sys.stdout.write(out)
-                 #sys.stdout.flush()
         
     def pasarInfoDlider(self):
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -394,29 +364,32 @@ class Node:
             NodosActivos=data.encode('utf-8')
             s.send(NodosActivos)
             s.close()
-            count+=1     
+            count+=1    
 
-    def join(self,id,ip):
+    #def join(self,id,ip):
         
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-         
-           try:
-            s.connect((ip, 8004))
-            s.send(b"soy el lider")
-            data=s.recv(1024)
-            if data.decode('utf-8')=="Nodo Soy FTP":
-                
-                data=json.dumps(self.listaDNodos)
-                listadIps=data.encode()
-                s.send(listadIps)
-                if self.listaDNodos.count(ip)==0:
-                  s.send(b"eres nuevo")
-                else:
-                  s.send(b"no eres nuevo")
 
-            s.close()
-           except:
-            print("El nodo {} no es servidor".format(ip))
+
+        #with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+         
+
+         #  try:
+          #  s.connect((ip, 8004))
+           # s.send(b"soy el lider")
+           # data=s.recv(1024)
+           # if data.decode('utf-8')=="Nodo Soy FTP":
+                
+           #     data=json.dumps(self.listaDNodos)
+           #     listadIps=data.encode()
+           #     s.send(listadIps)
+           #     if self.listaDNodos.count(ip)==0:
+           #       s.send(b"eres nuevo")
+           #     else:
+           #       s.send(b"no eres nuevo")
+
+            #s.close()
+           #except:
+          #  print("El nodo {} no es servidor".format(ip))
 
     #def reajustarNodo():
       
@@ -439,13 +412,7 @@ class Node:
                   COMMAND=conn.recv(1024)
                   self._sucesor=COMMAND.decode('utf-8')
 
-    def leave(self,id):
-     controlDNodos[id]=False
-     ip_predecesor=get_predecesor(self.listaDNodos[id])
-     ip_sucesor=get_sucesor(self.listaDNodos[id])
-     actualizasucesor(ip_predecesor,ip_sucesor)
-     actualizapredecesor(ip_sucesor,ip_predecesor)
-     self.updatefingertables(id,ip_sucesor,"leave")
+    
      
 
     def updatefingertables(self,id,evento):
