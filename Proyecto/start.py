@@ -1,5 +1,6 @@
 import os
 import socket, sys
+from directory_manager import Directory_Manager
 from ftp import ServerFTP
 from log import Log
 from threading import Thread
@@ -12,6 +13,7 @@ path = os.getcwd()
 def server_listener():
     global listen_sock
     log = Log()
+    directory_manager = Directory_Manager()
     log.LogClear()
     log.LogMessageServer(f'FTP Server - {IP}:{PORT} \n')
     listen_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -24,7 +26,7 @@ def server_listener():
         connection, address = listen_sock.accept()
         connection.settimeout(5)
         log.LogWarning(f'Conexion aceptada en {address}')
-        f = ServerFTP(connection, address, IP, PORT, log, path )
+        f = ServerFTP(connection, address, IP, PORT, log, path, directory_manager)
         f.start()
 
 if __name__ == "__main__":

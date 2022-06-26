@@ -5,12 +5,13 @@ from threading import Thread
 import time
 import sys
 import tqdm
+from directory_manager import Directory_Manager
 from return_codes import Return_Codes
 from log import Log
 from help import Help_Commands
 
 class ServerFTP(Thread):
-    def __init__(self, connection, address, ip, port, log: Log, path):
+    def __init__(self, connection, address, ip, port, log: Log, path, directory_manager: Directory_Manager):
         Thread.__init__(self)
         self.__ip = ip
         self.__port = port
@@ -38,6 +39,7 @@ class ServerFTP(Thread):
         self.__password = None
         
         self.log = log
+        self.directory_manager = directory_manager
 
     '''
         Publics
@@ -490,7 +492,7 @@ class ServerFTP(Thread):
         readmode = 'w+b' if  self.type == 'I' else 'w'
 
         try:
-            with open(filename, readmode) as f:
+            with self.directory_manager.open_file(filename, readmode) as f:
                 
                 while True:
                     bytes_recieved = self.data_connection.recv(self.__buffer)
@@ -531,7 +533,7 @@ class ServerFTP(Thread):
         readmode = 'w+b' if  self.type == 'I' else 'w'
 
         try:
-            with open(filename, readmode) as f:
+            with self.directory_manager.open_file(filename, readmode) as f:
                 
                 while True:
                     bytes_recieved = self.data_connection.recv(self.__buffer)
@@ -563,7 +565,7 @@ class ServerFTP(Thread):
         self.log.LogWarning(f"Descargando archivo... {filename}", self.control_address[0], self.control_address[1])
 
         try:
-            filesize = os.path.getsize(filename)
+            filesize = self.directory_manager.get_file_size(filename)
         except OSError as error:
             self.log.LogError(self.control_address[0], self.control_address[1], f"Algo salio mal para el usuario {self.__user}. Excepcion- {error}.")
             self.__send_control(Return_Codes.Code_550().encode())
@@ -578,7 +580,7 @@ class ServerFTP(Thread):
         readmode = 'rb' if  self.mode == 'I' else 'r'
 
         try: 
-            with open(filename, readmode) as f:
+            with self.directory_manager.open_file(filename, readmode) as f:
 
                 for _ in progress:
 
@@ -611,11 +613,11 @@ class ServerFTP(Thread):
         self.__send_control(Return_Codes.Code_150().encode())
         self.__open_data_connection()
         
-        if not os.path.isdir(path):
+        if not self.directory_manager.is_directory(path):
             self.__send_control(Return_Codes.Code_550().encode())
             self.log.LogError(self.control_address[0], self.control_address[1], f"La ruta {path} no existe.")
             return
-        l = os.listdir(path)
+        l = self.directory_manager.list_directory(path)
         for t in l:
             if self.__has_access(t):
                 k = self.__to_list_item(t, path)
@@ -649,7 +651,7 @@ class ServerFTP(Thread):
         self.__open_data_connection()
 
         try:
-            with open(filename, 'a') as f:
+            with self.directory_manager.open_file(filename, 'a') as f:
                 
                 while True:
                     bytes_recieved = self.data_connection.recv(self.__buffer)
@@ -703,11 +705,11 @@ class ServerFTP(Thread):
             else:
                 pathname += str(names[i]) + " "
         try:
-            if not os.path.isfile(self.__fd_rename) and not os.path.isdir(self.__fd_rename):
+            if not self.directory_manager.is_file(self.__fd_rename) and not self.directory_manager.is_directory(self.__fd_rename):
                 self.__send_control(Return_Codes.Code_550().encode())
                 self.log.LogError(self.control_address[0], self.control_address[1], f"El archivo/directorio {self.__fd_rename} no existe.")
                 return
-            os.rename(self.__fd_rename, pathname)
+            self.directory_manager.rename(self.__fd_rename, pathname)
             self.__send_control(Return_Codes.Code_250().encode())
             self.log.LogOk(self.control_address[0], self.control_address[1], f"El usurio {self.__user} ha renombrado satisfactoriamente el archivo {self.__fd_rename} a {pathname}.")
             self.__fd_rename = None
@@ -729,12 +731,12 @@ class ServerFTP(Thread):
                 pathname += str(names[i])
             else:
                 pathname += str(names[i]) + " "
-        if not os.path.isfile(pathname):
+        if not self.directory_manager.is_file(pathname):
             self.__send_control(Return_Codes.Code_550().encode())
             self.log.LogError(self.control_address[0], self.control_address[1], f"El archivo {pathname} no existe.")
             return
         try: 
-            os.remove(pathname)
+            self.directory_manager.delete_file(pathname)
             self.log.LogOk(self.control_address[0], self.control_address[1], f"El usuario {self.__user} ha eliminado el archivo {pathname}.")
             self.__send_control(Return_Codes.Code_250().encode())
         except OSError as error:
@@ -755,11 +757,11 @@ class ServerFTP(Thread):
                 pathname += str(names[i]) + " "
         
         try: 
-            if not os.path.isdir(pathname):
+            if not self.directory_manager.is_directory(pathname):
                 self.__send_control(Return_Codes.Code_550().encode())
                 self.log.LogError(self.control_address[0], self.control_address[1], f"El directorio {pathname} no existe.")
                 return
-            os.rmdir(pathname)
+            self.directory_manager.delete_directory(pathname)
             self.log.LogOk(self.control_address[0], self.control_address[1], f"El usuario {self.__user} ha eliminado el directorio {pathname}.")
             self.__send_control(Return_Codes.Code_250().encode())
 
@@ -782,11 +784,11 @@ class ServerFTP(Thread):
                 pathname += str(names[i]) + " "
 
         try:
-            if os.path.isdir(pathname):
+            if self.directory_manager.is_directory(pathname):
                 self.__send_control(Return_Codes.Code_550().encode())
                 self.log.LogError(self.control_address[0], self.control_address[1], f"Ya existe {pathname} como ruta.")
                 return
-            os.mkdir(pathname)
+            self.directory_manager.create_directory(pathname)
             self.log.LogOk(self.control_address[0], self.control_address[1], f"El usuario {self.__user} ha creado la ruta {pathname}.")
             self.__send_control(Return_Codes.Code_257(pathname).encode())
 
