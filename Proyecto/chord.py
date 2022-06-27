@@ -1,5 +1,6 @@
 import os
 import csv
+from posixpath import split
 import time
 import datetime
 from typing_extensions import Self
@@ -45,7 +46,7 @@ class Node:
         self.hayLider=False
         self.listaDNodos=[]
         self.peticiones=[]  # aqui se guardan las peticiones de los clientes
-       
+        self.ElliderLoLLama=False
 
         #Todo Nodo debe saber si es el lider , en caso de que lo sea debe realizar acciones especificas
         # self.fingertable = {((self._id+(i**2))%2**160) : self._ip for i in range(160)} #!ID:IP
@@ -78,103 +79,51 @@ class Node:
              conn, addr = servidor.accept() # Establecemos la conexión con el cliente
              data=conn.recv(1024)
              self._peticiones.append(data)
-
-    def start_comunication(self):
-        try:
-            #pin=check_ping('192.168.128.254')
-            #MinNodos=1   #esta variable solo es para saber el minimo de nodos que deben estar en el sistema para levantarlo en un principio 
-            self._ipLider=self._ip
-            self._id=0
-            self.listaDNodos.append(self._ip)
-            controlDNodos.append(True)
-            BUFFER_SIZE=1024
-            self.server = socket.socket(
-                socket.AF_INET, socket.SOCK_STREAM)
-            self.server.bind((self._ip,12345))
-            self.server.listen()
-            while(MinNodos>0):
-             #self.server.settimeout(1000)
-             conn, addr = self.server.accept() # Establecemos la conexión con el cliente 
-             if conn:   
-            # Recibimos bytes, convertimos en str
-               data = conn.recv(BUFFER_SIZE)
-            # Verificamos que hemos recibido datos
-               if not data:
-                 continue
-               
-               if data.decode('utf-8')=="Nodo Soy FTP":
-                 print(data)
-                 print('[*] Datos recibidos: {}'.format(data.decode('utf-8'))) 
-                 conn.send(bytes(str(len(self.listaDNodos)),'utf8')) # Hacemos echo convirtiendo de nuevo a bytes
-                 self.listaDNodos.append(addr[0])
-                 pin=check_ping(addr[0])
-                 conn.close()
-                 MinNodos-=1
-               else:
-                continue
-                #conn.settimeout(10000)
-                #conn,addr = self.server.accept() # Establecemos la conexión con el cliente
-                
-                #ahora asignamos los sucesores , predecesores y fingertables
-            self.server.close()
-            self.creaFingertable()
-            self.completar_nodos()
-            self.pasarInfoDlider() 
-
-        except socket.error:
-#           # prRed('Error abriendo socket') 
-            return
-        
-       
-        SERVER_HOST = 'DESKTOP-P0GKUJT'
-        SERVER_PORT = 12345
-
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-
-          s.connect((SERVER_HOST, SERVER_PORT))
-          #nombre_d_equipo=socket.gethostname()
-          #ip=socket.gethostbyname(nombre_d_equipo)
-          s.send(b"Nodo Soy FTP")
-          #s.send(b"{}".__format__(ip))
-          data = s.recv(1024)
-          self._id=int(data.decode('utf-8'))
-          s.close()
-
-        SERVER_PORT= 8000  #Puerto para actualizar la informacion de los nodos al principio
-        self.server = socket.socket(
-               socket.AF_INET, socket.SOCK_STREAM)
-          
-        self.server.bind((self._ip,SERVER_PORT))
-        self.server.listen()
-        conn, addr = self.server.accept() # Establecemos la conexión con el cliente
-        
-        with conn:
-              datapredecesor = conn.recv(BUFFER_SIZE)
-              ippredecesor=datapredecesor.decode('utf-8')
-              self._predecesor=int(ippredecesor)
-              datasucesor = conn.recv(BUFFER_SIZE)
-              ipsucesor=datasucesor.decode('utf-8')
-              self._sucesor=int(ipsucesor)
-              data=conn.recv(1024)
-              self._ipLider=data.decode('utf-8')
-              data=conn.recv(1024)
-              ipdnodos=data.decode('utf-8')
-              listaDNodos=json.loads(ipdnodos)
-              data=conn.recv(1024)
-              NodosActivos=data.decode('utf-8')
-              listaDNodos=json.loads(NodosActivos)
-              conn.close()
-        self.creaFingertable()
-          
-        print("Sistema listo para Comenzar")
-        self.run()
           
     def creaFingertable(self):
          for i in range(6):
             key=self._id+pow(2,i)
             self.fingertable.setdefault(key,key)
          
-    def run(self):  ###Arreglar metodo , hay casos en los que un nodo puede dar ping y el servidor no estar levantado
+    def recibiendoSenalDlider(self):
+        SERVER_PORT= 8003  
+        self.server = socket.socket(
+               socket.AF_INET, socket.SOCK_STREAM)
+          
+        self.server.bind((self._ip,SERVER_PORT))
+        self.server.listen()
+        conn, addr = self.server.accept() # Establecemos la conexión con el cliente
+        if conn:
+             data=conn.recv(1024)
+             if data.decode('utf-8')=="Estas activo?":
+              conn.send(b'Nodo Soy FTP')
+              self.ElliderLoLLama=True
+              self._ipLider=addr[0]
+              conn.close()
+  
+    def buscalider(self):
+         threading.Thread(target=self.conectaNodosIndep(), args=()).start()
+         ip=self._ip
+         number=''
+         while ip[len(ip)-1]!='.':
+            number=ip[len(ip)-1]+number
+            ip=ip[0:len(ip)-2]
+         number=int(number)
+         pos=2
+         while pos<=number:
+           if pos==number:
+                 self._ipLider=self._ip
+                 self.id=0
+                 self.listaDNodos.append(self._ip)
+                 controlDNodos.append(True)
+                 self._sucesor=self._ip
+                 self._predecesor=self._ip
+
+           if check_ping(ip+str(pos)):
+              break
+           pos+=1   
+#
+    def run(self):  
       
      while True:
 
@@ -182,27 +131,25 @@ class Node:
          while self._ipLider==self._ip:
           self.stabilize()
           self.updatefingertables()
-      else:
-         if not check_ping(self._ipLider):
+      elif self._ipLider==None:
+              threading.Thread(target=self.recibiendoSenalDlider, args=()).start()
+              temporizador=7
+              while True:
+                if self.ElliderLoLLama:
+                  break
+                if temporizador==0:
+                  self.buscalider()
+                  break
+                else: 
+                   time.sleep(1)
+                   temporizador-=1
+
+      elif not check_ping(self._ipLider):
           self.hayLider=False
           threading.Thread(target=self.esperaActualizacionDlider, args=()).start()
           threading.Thread(target=self.seleccionalider, args=()).start()
-          
-         if self._ipLider!=self._ip:
-          self.actividad()
-                               
-         
-            #Antes de continuar todos tienen que saber quien es el lider 
-
-         #threading.Thread(target=self.buscaLider, args=()).start()
-         #threading.Thread(target=self.stabilize, args=()).start()
-         #threading.Thread(target=self.listenThread, args=()).start()
-         #if self._soyLider
-          #print("ya")
-         
-         # threading.Thread(target=self.fix_fingers, args=()).start()
-         
-         # threading.Thread(target=self.update_successors, args=()).start()
+      else:
+          self.escucha()
     
     def esperaActualizacionDlider(self):
           SERVER_PORT = 8002
@@ -247,7 +194,8 @@ class Node:
                       self.leave(self.listaDNodos.index(ip+str(i)))
                     s.close()
                  except:
-                    self.leave(self.listaDNodos.index(ip+str(i)))                    
+                    if controlDNodos[self.listaDNodos.index(ip)]:
+                     self.leave(self.listaDNodos.index(ip+str(i)))                    
               elif check_ping(ip+str(i)):
                       try :
                         s.connect(ip+str(i),8003)
@@ -303,66 +251,6 @@ class Node:
                s.close()
               except:
                 print("Otro nodo salio del sistema ,se vera cuando lleguemos a el")
-      
-
-      #self.updatefingertables(id,ip_sucesor,"leave")
-
-
-    def actividad(self):
-        server = socket.socket(
-                socket.AF_INET, socket.SOCK_STREAM)
-        server.bind((self._ip,8003))
-        server.listen()
-        conn, addr = self.server.accept()
-    
-    def completar_nodos(self):
-            HOSTPORT=8000
-          #if len(self.listaDNodos)==1:
-            #self._predecesor=self.listaDNodos[len(self.listaDNodos)-1]
-            #if self._ultimoidAsignado+1<len(self.listaDNodos):
-           #     self._sucesor=self.listaDNodos[self._ultimoidAsignado+1]
-          #else: 
-            
-            
-            count=0
-            for IpDnodo in self.listaDNodos:
-               if count==0:
-                 self._predecesor=self.listaDNodos[len(self.listaDNodos)-1]
-                 self._sucesor=self.listaDNodos[count+1]
-                 self._ipLider=self._ip
-               else:
-                try:
-                 with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                  s.connect((IpDnodo, HOSTPORT))
-                  s.sendall(b"{}".__format__(str(self.listaDNodos[count-1]).encode('utf-8')))
-                  if count<len(self.listaDNodos)-1:
-                    s.sendall(b"{}".__format__(str((count+1)).encode('utf-8')))
-                  else:
-                    s.sendall(b"{}".__format__(str(self.listaDNodos[0]).encode('utf-8')))
-                  s.close()
-                  controlDNodos.append(True)
-                except:
-                  print("error")
-               count+=1
-        
-    def pasarInfoDlider(self):
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-
-         HOSTPORT=8000   
-         count=0
-        
-         for ipnodo in self.listaDNodos:
-            if count==0:
-                continue
-            s.connect((ipnodo, HOSTPORT))
-            data=json.dumps(self.listaDNodos)
-            listadIps=data.encode('utf-8')
-            s.send(listadIps)
-            data=json.dumps(controlDNodos)
-            NodosActivos=data.encode('utf-8')
-            s.send(NodosActivos)
-            s.close()
-            count+=1    
 
     def join(self,ip):
         soyNuevo=True
@@ -382,12 +270,16 @@ class Node:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
          for nodo in self.listaDNodos:
            if nodo!=ip:             
+             if controlDNodos[self.listaDNodos.index(nodo)]:
               try:
                s.connect(nodo,8005)
                s.send(b"JOIN")
-               s.send(b"{}".__format__(str(self.listaDNodos.index(ip))))
+               send_list=json.dumps(controlDNodos)
+               s.send(b"{}".__format__(send_list.encode('utf-8')))
+               send_list=json.dumps(self.listaDNodos)
+               s.send(b"{}".__format__(send_list.encode('utf-8')))
                if soyNuevo:
-                s.send(b"{}".__format__(ip))
+                s.send(b"{}".__format__(str(self.listaDNodos.index(ip)).encode('utf-8')))
                else:
                 s.send(b"")
                s.close()
@@ -400,7 +292,7 @@ class Node:
           
          servidor.bind((self._ip,8005))
          servidor.listen()
-         conn, addr = self.server.accept()
+         conn, addr = servidor.accept()
          COMMAND=conn.recv(1024)
          if COMMAND.decode('utf-8')=="actualiza predecesor":
                   COMMAND=conn.recv(1024)
@@ -413,13 +305,15 @@ class Node:
                   controlDNodos[int(COMMAND.decode('utf-8'))]=False
          elif COMMAND.decode('utf-8')=="JOIN":
                   COMMAND=conn.recv(1024)
-                  controlDNodos[int(COMMAND.decode('utf-8'))]=True
+                  controlDNodos= json.loads(COMMAND.decode('utf-8'))
                   COMMAND=conn.recv(1024)
-                  ip=COMMAND.decode('utf-8')
-                  if ip!="":
-                     self.listaDNodos.append(ip)
-
-    def updatefingertables(self,id,evento):
+                  self.listaDNodos=json.loads(COMMAND.decode('utf-8'))
+                  COMMAND=conn.recv(1024)
+                  self._id=int(COMMAND.decode('utf-8'))
+                  self._ipLider=addr[0]
+         
+    def updatefingertables(self):
+          
           with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
            if evento=="leave":
             while(id>=0) :
@@ -483,4 +377,4 @@ if __name__ == '__main__':
  nombre_equipo = socket.gethostname()
  direccionIP_equipo = socket.gethostbyname(nombre_equipo)
  nodo=Node(direccionIP_equipo)
- nodo.start_comunication()
+ nodo.run()
