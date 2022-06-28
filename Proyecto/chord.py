@@ -1,3 +1,4 @@
+from errno import ELIBBAD
 import hashlib
 import os
 import csv
@@ -22,16 +23,12 @@ from ping3 import ping
 #Si el nodo i de la red esta activo se guarda True, esta lista servira para comprobar constantemente 
 # si un nodo se desactivo o si un nodo se activo
 controlDNodos=[]
-SystemaEstable=True
+SistemaEstable=True
 
 #esta variable es para saber el estado en que se encuentra chord , si buscando un elemento , si anadiendo un elemento o si esta reorganizando
 #los nodos
 estadoDChord=None
 
-class Archivo:
-   def __init__(self,hash,id):
-      self.id=id
-      self.hash=hash
 
 def check_ping(hostname):
   resp=ping(hostname)
@@ -40,12 +37,14 @@ def check_ping(hostname):
   else:
     return True
 
+#Recordar pasar la peticiones a los demas nodos por si el lider se cae
 
 class Node:
     def __init__(self,ip):
         self._id=None
         self._ip=ip
         self._archivos=list()  #se guardaran los archivos que esten almacenados en este nodo , mas alla que sea una replica . 
+        self._archivosDelSistema=dict()  #Aqui se guardara el hash del archivo y en que nodos esta almacenado
         self._predecesor=None
         self._sucesor=None
         self.fingertable=dict()
@@ -65,19 +64,16 @@ class Node:
     #def procesapeticion(self):
        #for peticion in self.peticiones:
         # if peticio
-    
-    def ejecutaSubida(self,archivo,subida):
-         hashdelArchivo= hashlib.sha256(archivo).hexdigest()
-         newArchivo=Archivo(hashdelArchivo,self._id)
-         if self._archivos.count(hashdelArchivo)==0:
-             self._archivos.append(hashdelArchivo)
-         return True
 
     def ejecutaDescarga(archivo,self):
            codigoHash=hashlib.sha256(archivo).hexdigest()
+           if self._archivos.count(codigoHash)==1:
+               ####Busca el archivo y retornarlo
+               return archivo
+           
            
 
-    def avisoDInestabilidad(self):
+    def recibePeticionesdelSistema(self):
         server = socket.socket(
                socket.AF_INET, socket.SOCK_STREAM)
           
@@ -90,20 +86,116 @@ class Node:
             if data=='Inestable' and self.listaDNodos.count(addr[0])==1 and controlDNodos[self.listaDNodos.index(addr[0])]==True:
                 SystemaEstable=False
                 conn.close()
+            elif data=="dame sucesor":
+                 conn.send("{}".format(self._sucesor))
+            elif data=="Save":
+                 #######Aqui hay que recibir el archivo y guardarlo
+                 ##if se guarda bien entonces
+                 hashdelArchivo= hashlib.sha256().hexdigest()
+                 self._archivos.append(hashdelArchivo)
+                 conn.send(b"Save")
+                 #ELse:
+                 conn.send("")
+            elif data=="Actualiza Archivos":
+                  data=conn.recv(1024).decode('utf-8')
+                  self._archivosDelSistema.keys= json.loads(data)
+                  data=conn.recv(1024).decode('utf-8')
+                  self._archivosDelSistema.values= json.loads(data)
+                  
+        conn.close()
+
+
+    def ejecutaSubida(self,archivo):  #Este metodo escoge el nodo que lo almacenara y le envia un mensaje para que lo guarde
+          if self._archivos.count(hashlib.sha256(archivo).hexdigest())==0:
+           with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s: 
+             ip=None
+             cantidadDArchivos=0
+             count=0
+             for nodo in self.listaDNodos:
+                if controlDNodos[count]==True:
+                   try:
+                    s.connect(nodo,8008)
+                    s.send(b"Archivos")
+                    data=s.recv(1024)
+                    if count==0:
+                       ip=nodo
+                       cantidadDArchivos= int(data.decode('utf-8'))
+                    elif int(data.decode('utf-8'))<cantidadDArchivos:
+                        ip=nodo
+                        cantidadDArchivos=int(data.decode('utf-8'))
+                   except:
+                     SistemaEstable=False
+                     return False
+                count+=1
+                s.close()
+             try:#Replicacion
+               s.connect(ip,8008)
+               s.send(b'Save')
+               s.sendfile(archivo)
+               data=s.recv(1024)
+               if not data.decode('utf-8')=="Save":
+                   return False
+               s.close()
+               hashdelArchivo= hashlib.sha256(archivo).hexdigest()
+               self._archivos.append(hashdelArchivo)
+               self._archivosDelSistema.setdefault(hashdelArchivo,[ip])
+               cantidadDReplicas=4
+               while cantidadDReplicas>0:
+                s.connect(ip,8008)
+                s.send(b'dame sucesor')
+                data=s.recv(1024)
+                ip=data.decode('utf-8')
+                s.close()
+                s.connect(ip,8008)
+                s.send(b'Save')          #Hacer que los nodos confirmen cuando hayan realizado el almacenamiento
+                s.sendfile(archivo)
+                data=s.recv(1024)
+                if not data.decode('utf-8')=="Save":
+                   return False
+                valueKey=self._archivosDelSistema.get(hashdelArchivo)
+                valueKey.append(ip)
+                self._archivosDelSistema.update(hashdelArchivo,valueKey)
+                s.close()
+                cantidadDReplicas-=1
+             except:
+                SistemaEstable=False
+                return False
+            
+             return True
+
+          else:
+            print("El archivo ya existe en el sistema")
+
+    def actualizaNodosDSistema(self):
+          i=0
+          with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s: 
+           for nodo in self.listaDNodos:
+             if controlDNodos[i]==True:
+                s.connect(nodo,8008)
+                s.send(b'Actualiza Archivos')
+                send_list=json.dumps(self._archivosDelSistema.keys())
+                s.send(b"{}".__format__(send_list.encode('utf-8')))
+                send_list=json.dumps(self._archivosDelSistema.values())
+                s.send(b"{}".__format__(send_list.encode('utf-8')))
+                s.close()
+
 
     def procesapeticiones(self):
 
-      threading.Thread(target=self.avisoDInestabilidad, args=()).start()
-      while SystemaEstable :
+      threading.Thread(target=self.recibePeticionesdelSistema(), args=()).start()
+      while SistemaEstable :
          
-         if len(self.peticiones)>0:
-          peticion=self.peticiones[0]
-          if peticion=="subir":
-           self.ejecutaSubida(peticion)
-          if peticion=="descargar":
-           self.ejecutaDescarga(peticion)
-          if peticion=="editar":
-           self.ejecutaEdicion(peticion)       
+         if self._ip==self._ipLider:
+           if len(self.peticiones)>0:
+             peticion=self.peticiones[0]
+             if peticion=="subir":
+                self.ejecutaSubida(peticion)
+                self.actualizaNodosDSistema()
+             if peticion=="descargar":
+               self.ejecutaDescarga(peticion)
+
+             if peticion=="editar":
+               self.ejecutaEdicion(peticion)       
 
     def recepcionarpeticiones(self):
             servidor = socket.socket(
