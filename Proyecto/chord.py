@@ -1,3 +1,4 @@
+import hashlib
 import os
 import csv
 from posixpath import split
@@ -17,6 +18,7 @@ from setuptools import Command
 from ping3 import ping
 
 
+
 #Si el nodo i de la red esta activo se guarda True, esta lista servira para comprobar constantemente 
 # si un nodo se desactivo o si un nodo se activo
 controlDNodos=[]
@@ -26,6 +28,11 @@ SystemaEstable=True
 #los nodos
 estadoDChord=None
 
+class Archivo:
+   def __init__(self,hash,id):
+      self.id=id
+      self.hash=hash
+
 def check_ping(hostname):
   resp=ping(hostname)
   if resp==False or resp==None:
@@ -33,12 +40,12 @@ def check_ping(hostname):
   else:
     return True
 
+
 class Node:
     def __init__(self,ip):
         self._id=None
         self._ip=ip
-        self._keys=dict() #cada llave de un archivo esta conformada por el id del nodo al que perteneces concatenado con una funcion hash , ya que pueden haber dos archivos con el mismo nombre y no ser el mismo.
-                         #por cada llave se guarda una lista con los id de los nodos en los que esta replicado el elemento
+        self._archivos=list()  #se guardaran los archivos que esten almacenados en este nodo , mas alla que sea una replica . 
         self._predecesor=None
         self._sucesor=None
         self.fingertable=dict()
@@ -47,6 +54,7 @@ class Node:
         self.listaDNodos=[]
         self.peticiones=[]  # aqui se guardan las peticiones de los clientes
         self.ElliderLoLLama=False
+        self.sistemaEstable=False
 
         #Todo Nodo debe saber si es el lider , en caso de que lo sea debe realizar acciones especificas
         # self.fingertable = {((self._id+(i**2))%2**160) : self._ip for i in range(160)} #!ID:IP
@@ -57,18 +65,45 @@ class Node:
     #def procesapeticion(self):
        #for peticion in self.peticiones:
         # if peticio
+    
+    def ejecutaSubida(self,archivo,subida):
+         hashdelArchivo= hashlib.sha256(archivo).hexdigest()
+         newArchivo=Archivo(hashdelArchivo,self._id)
+         if self._archivos.count(hashdelArchivo)==0:
+             self._archivos.append(hashdelArchivo)
+         return True
 
+    def ejecutaDescarga(archivo,self):
+           codigoHash=hashlib.sha256(archivo).hexdigest()
+           
+
+    def avisoDInestabilidad(self):
+        server = socket.socket(
+               socket.AF_INET, socket.SOCK_STREAM)
+          
+        server.bind((self._ip,8008))
+        server.listen()
+        conn, addr = server.accept()
+        if conn:
+            data=conn.recv(1024)
+            data=data.decode('utf-8')
+            if data=='Inestable' and self.listaDNodos.count(addr[0])==1 and controlDNodos[self.listaDNodos.index(addr[0])]==True:
+                SystemaEstable=False
+                conn.close()
 
     def procesapeticiones(self):
-      
+
+      threading.Thread(target=self.avisoDInestabilidad, args=()).start()
       while SystemaEstable :
-          peticion=self.procesapeticion()
+         
+         if len(self.peticiones)>0:
+          peticion=self.peticiones[0]
           if peticion=="subir":
-           threading.Thread(target=self.ejecutaSubida(), args=()).start()
+           self.ejecutaSubida(peticion)
           if peticion=="descargar":
-           threading.Thread(target=self.ejecutaDescarga(), args=()).start()
+           self.ejecutaDescarga(peticion)
           if peticion=="editar":
-           threading.Thread(target=self.ejecutaEdicion(), args=()).start()       
+           self.ejecutaEdicion(peticion)       
 
     def recepcionarpeticiones(self):
             servidor = socket.socket(
@@ -126,12 +161,15 @@ class Node:
     def run(self):  
       
      while True:
+      
+      if not self.sistemaEstable:
 
-      if self._ipLider==self._ip:
+       if self._ipLider==self._ip:
          while self._ipLider==self._ip:
           self.stabilize()
           self.updatefingertables()
-      elif self._ipLider==None:
+          self.sistemaEstable=True
+       elif self._ipLider==None:
               threading.Thread(target=self.recibiendoSenalDlider, args=()).start()
               temporizador=7
               while True:
@@ -143,14 +181,17 @@ class Node:
                 else: 
                    time.sleep(1)
                    temporizador-=1
-
-      elif not check_ping(self._ipLider):
+        
+       elif not check_ping(self._ipLider):
           self.hayLider=False
           threading.Thread(target=self.esperaActualizacionDlider, args=()).start()
           threading.Thread(target=self.seleccionalider, args=()).start()
-      else:
+       else:
           self.escucha()
-    
+      else:
+          self.procesapeticiones()
+
+
     def esperaActualizacionDlider(self):
           SERVER_PORT = 8002
 
@@ -378,3 +419,14 @@ if __name__ == '__main__':
  direccionIP_equipo = socket.gethostbyname(nombre_equipo)
  nodo=Node(direccionIP_equipo)
  nodo.run()
+   
+  
+  
+
+
+
+
+
+
+
+
