@@ -54,6 +54,7 @@ class Node:
         self.peticiones=[]  # aqui se guardan las peticiones de los clientes
         self.ElliderLoLLama=False
         self.sistemaEstable=False
+        self.finishCountDown=False
 
         #Todo Nodo debe saber si es el lider , en caso de que lo sea debe realizar acciones especificas
         # self.fingertable = {((self._id+(i**2))%2**160) : self._ip for i in range(160)} #!ID:IP
@@ -65,12 +66,38 @@ class Node:
        #for peticion in self.peticiones:
         # if peticio
 
+    def countdown(self,num_of_secs):
+     while num_of_secs:
+        m, s = divmod(num_of_secs, 60)
+        min_sec_format = '{:02d}:{:02d}'.format(m, s)
+        print(min_sec_format, end='/r')
+        time.sleep(1)
+        num_of_secs -= 1
+        
+     self.finishCountDown=True
+        
+
+    def pidelo(self,hash):
+         nodosQueLotienen= self._archivosDelSistema[hash]
+         for idnodo in nodosQueLotienen:
+           if self.listaDNodos[idnodo]==True:
+                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s: 
+                     s.connect(self.listaDNodos[idnodo],8008)
+                     s.send(b"dame archivo")
+                     s.send("{}".format(hash))
+                      ####Pedir ARCHIVO
+                     archivo=s.recv(1024)
+                       #Retornar el archivo
+                     return
+
     def ejecutaDescarga(archivo,self):
+           
            codigoHash=hashlib.sha256(archivo).hexdigest()
            if self._archivos.count(codigoHash)==1:
                ####Busca el archivo y retornarlo
                return archivo
-           
+           else:
+             return self.pidelo()
            
 
     def recibePeticionesdelSistema(self):
@@ -101,6 +128,19 @@ class Node:
                   self._archivosDelSistema.keys= json.loads(data)
                   data=conn.recv(1024).decode('utf-8')
                   self._archivosDelSistema.values= json.loads(data)
+            elif data=="edita Archivo":
+                  hashAntiguo=conn.recv(1024).decode('utf-8')
+                  self._archivos.remove(hashAntiguo)
+                  #Remueve el archivo
+                  data=conn.recv(1024).decode('utf-8')
+                  hash=hashlib.sha256(data).hexdigest()
+                  #GuardarArchivo
+                  #Retroceder respuesta
+                  
+                  self._archivos.append(hash)
+            elif data=="dame archivo":
+                  hashAntiguo=conn.recv(1024).decode('utf-8')
+                  ##Retorna el archivo con el hash
                   
         conn.close()
 
@@ -178,12 +218,46 @@ class Node:
                 send_list=json.dumps(self._archivosDelSistema.values())
                 s.send(b"{}".__format__(send_list.encode('utf-8')))
                 s.close()
+             i+=1
+
+    def ejecutaEdicion(self,archivo,archivonuevo):
+          nodos=self._archivosDelSistema[archivo]
+          with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s: 
+             count=0
+             for nodo in nodos:
+                if controlDNodos[nodo]==True:
+                  try:
+                    s.connect(self.listaDNodos[nodo],8008)
+                    s.send(b"edita Archivo")
+                    hashAntiguo=None
+                    hashnuevo=None
+                    #s.send ####Enviar el has del archiv que se va a cambiar
+                    #s.send ###Enviar el archivo 
+                    data=s.recv(1024)
+                    data=data.decode('utf-8')
+                    if data=="Accepted":
+                     nodosDArchivoAntiguo=self._archivosDelSistema[hashAntiguo]
+                     nodosDArchivoAntiguo=nodosDArchivoAntiguo-nodo
+                     self._archivosDelSistema[hashAntiguo]=nodosDArchivoAntiguo
+                     if self._archivosDelSistema[hashAntiguo].count==0:
+                         self._archivosDelSistema[hashAntiguo]=self._archivosDelSistema[hashAntiguo].append(hashnuevo)
+
+                     if count==0:
+                        self._archivosDelSistema.setdefault(hashnuevo,[nodo])
+                     else:
+                        self._archivosDelSistema[hashnuevo]= self._archivosDelSistema[hashnuevo].append(nodo)
+
+                  except:
+                    SistemaEstable=False
+                count+=1
 
 
     def procesapeticiones(self):
 
+      threading.Thread(target=self.countdown(), args=()).start()   #Este temporizador es para mirar estabilizar el sistema cada un tiempo determinado
       threading.Thread(target=self.recibePeticionesdelSistema(), args=()).start()
-      while SistemaEstable :
+      
+      while SistemaEstable and not self.finishCountDown:
          
          if self._ip==self._ipLider:
            if len(self.peticiones)>0:
@@ -195,7 +269,7 @@ class Node:
                self.ejecutaDescarga(peticion)
 
              if peticion=="editar":
-               self.ejecutaEdicion(peticion)       
+               self.ejecutaEdicion(peticion,peticion)       
 
     def recepcionarpeticiones(self):
             servidor = socket.socket(
@@ -387,9 +461,13 @@ class Node:
 
     def join(self,ip):
         soyNuevo=True
-        if not self.listaDNodos.count(ip)==1:   #Te estas reconectando
+        if not self.listaDNodos.count(ip)==1:   #Te estas reconectando           
            controlDNodos[self.listaDNodos.index(ip)]=True
-           soyNuevo=False     
+           soyNuevo=False
+           with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s: 
+               s.connect(ip,8005)
+               s.send("")
+
         else:
           controlDNodos.append(True)
           self.listaDNodos.append(ip)
