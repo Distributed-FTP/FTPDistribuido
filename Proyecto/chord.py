@@ -44,7 +44,7 @@ class Node:
         self._id=None
         self._ip=ip
         self._archivos=list()  #se guardaran los archivos que esten almacenados en este nodo , mas alla que sea una replica . 
-        self._archivosDelSistema=dict()  #Aqui se guardara el hash del archivo y en que nodos esta almacenado
+        self._archivosDelSistema=dict()  #Aqui se guardara el hash del archivo y en que nodos esta replicaado
         self._predecesor=None
         self._sucesor=None
         self.fingertable=dict()
@@ -123,6 +123,15 @@ class Node:
                  conn.send(b"Save")
                  #ELse:
                  conn.send("")
+            elif data=="Save Original":
+                 #######Aqui hay que recibir el archivo y guardarlo
+                 ##if se guarda bien entonces
+                 
+                 hashdelArchivo= hashlib.sha256().hexdigest()
+                 self._archivos.append(hashdelArchivo)
+                 conn.send(b"Save Original")
+                 #ELse:
+                 conn.send("")
             elif data=="Actualiza Archivos":
                   data=conn.recv(1024).decode('utf-8')
                   self._archivosDelSistema.keys= json.loads(data)
@@ -168,19 +177,19 @@ class Node:
                      return False
                 count+=1
                 s.close()
-             try:#Replicacion
+             try:
                s.connect(ip,8008)
-               s.send(b'Save')
+               s.send(b'Save Original')
                s.sendfile(archivo)
                data=s.recv(1024)
-               if not data.decode('utf-8')=="Save":
+               if not data.decode('utf-8')=="Save Original":
                    return False
                s.close()
                hashdelArchivo= hashlib.sha256(archivo).hexdigest()
                self._archivos.append(hashdelArchivo)
                self._archivosDelSistema.setdefault(hashdelArchivo,[ip])
                cantidadDReplicas=4
-               while cantidadDReplicas>0:
+               while cantidadDReplicas>0:#Replicacion
                 s.connect(ip,8008)
                 s.send(b'dame sucesor')
                 data=s.recv(1024)
@@ -464,10 +473,6 @@ class Node:
         if not self.listaDNodos.count(ip)==1:   #Te estas reconectando           
            controlDNodos[self.listaDNodos.index(ip)]=True
            soyNuevo=False
-           with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s: 
-               s.connect(ip,8005)
-               s.send("")
-
         else:
           controlDNodos.append(True)
           self.listaDNodos.append(ip)
@@ -522,22 +527,29 @@ class Node:
                   COMMAND=conn.recv(1024)
                   self._id=int(COMMAND.decode('utf-8'))
                   self._ipLider=addr[0]
-         
-    def updatefingertables(self):
+         elif COMMAND.decode('utf-8')=="UpdateFingertables":
+                  for i in range(6):
+                   id=pow(2,i)+self._id
+                   self.fingertable[id]=self.sucesor(id)
+         conn.close()
+
+    def sucesor(id,self):
+      pos=id+1
+      if pos>=len(self.listaDNodos):
+         pos=0
+      while controlDNodos[pos]!=True:
+        pos+=1
+      return pos
+
+    def updatefingertables(self): #Luego poner el crear fingertables
           
           with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-           if evento=="leave":
-            while(id>=0) :
-             s.connect((self.listaDNodos[id], 8006))
-             s.send(b"leave {}".__format__(id.encode()))
-             s.close()
-             id-=1
-           else:
-             while(id>=0) :
-              s.connect((self.listaDNodos[id], 8006))
-              s.send(b"join {}".__format__(id.encode()))
-              s.close()
-              id-=1
+            for nodo in self.listaDNodos:
+              if controlDNodos[self.listaDNodos.index(nodo)]:
+                 s.connect(nodo,8005)
+                 s.send(b"UpdateFingertables")
+                 data=s.recv(1024)
+                 
 
     def get_predecesor(self,ip):
        pos=self.listaDNodos.index(ip)
