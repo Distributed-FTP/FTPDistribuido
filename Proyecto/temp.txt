@@ -1,5 +1,0 @@
-D~~/root/
-D~~/root/anonymous/
-D~~/root/anonymous/Prueba/
-D~~/root/Prueba/
-F~~/root/test.txt
