@@ -220,12 +220,12 @@ class Node:
         if conn:
             data=conn.recv(1024)
             data=data.decode('utf-8')
-            if data=='Inestable' and self.node_list.count(addr[0])==1 and node_control[self.node_list.index(addr[0])]==True:
+            if data=='1007: Unstable Chord' and self.node_list.count(addr[0])==1 and node_control[self.node_list.index(addr[0])]==True:
                 SystemaEstable=False
                 conn.close()
-            elif data=="dame sucesor":
+            elif data=="1008: Get Successor":
                 conn.send("{}".format(self.__successor))
-            elif data=="Save":
+            elif data=="1006: Save File":
                 file_text=conn.recv(1024*5).decode('utf-8')
                 hash=hashlib.sha256(file_text).hexdigest()
                 with open(hash, "wb") as file:
@@ -234,12 +234,12 @@ class Node:
                 self.__files_system.setdefault(hash,[])
                 conn.send(b"Save")
                 conn.send(str(self.__id)+","+hash)
-            elif data=="Actualiza Archivos":
+            elif data=="1003: Update File":
                 data=conn.recv(1024).decode('utf-8')
                 self.__files_system.keys= json.loads(data)
                 data=conn.recv(1024).decode('utf-8')
                 self.__files_system.values= json.loads(data)
-            elif data=="edita archivo":
+            elif data=="1004: Edit File":
                 id=conn.recv(1024).decode('utf-8')
                 hash=conn.recv(1024).decode('utf-8')
                 file_id=id+","+hash
@@ -260,13 +260,13 @@ class Node:
                         if replica!=self.__ip:
                             if node_control[self.node_list.index(replica)]==True:
                                 s.connect(replica,8008)
-                                s.send(b"edita replica")
+                                s.send(chord_protocol.get_replica())
                                 s.send(hash)
                                 s.sendfile(file_text)
 
                 self.__files.append(hash)
                 self.__files_system[hash]=hash_new_file
-            elif data=="edita replica":
+            elif data=="1010: Get Replica":
                 hash=conn.recv(1024).decode('utf-8')  
                 file_text=conn.recv(1024)
                 hash_new_file=hashlib.sha256(file_text).hexdigest()
@@ -276,22 +276,22 @@ class Node:
                 self.__files_system.setdefault(hash_new_file, self.__files_system[hash])   
                 self.__files.remove(hash)
                 self.__files.append(hash_new_file) 
-            elif data=="busca archivo":
+            elif data=="1001: Search File":
                 id=int(conn.recv(1024).decode('utf-8'))
                 hash=conn.recv(1024).decode('utf-8')
                 archivo=self.find_file(hash,None,id,"Descarga")
                 conn.sendfile(archivo)
-            elif data=="busca archivo para edicion":
+            elif data=="1002: Search for Edit File":
                   id=int(conn.recv(1024).decode('utf-8'))
                   hash=conn.recv(1024).decode('utf-8')
                   archivo=conn.recv(1024).decode('utf-8')  ##Recibir el archivo de alguna forma
                   self.find_file(hash,archivo,id,"Edicion")
                 ###Mandar el archivo  conn.sendfile
-            elif data=="dame archivo":
+            elif data=="1000: Get File":
                 hash_code=conn.recv(1024).decode('utf-8')
                 with open(hash_code, 'rb') as f:
                   conn.sendfile(f)
-            elif data=="actualiza Info":
+            elif data=="1005: Update Info":
                 hash=conn.recv(1024).decode('utf-8')
                 data=conn.recv(1024).decode('utf-8')
                 data=json.loads(data)
