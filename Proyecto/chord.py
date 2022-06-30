@@ -8,7 +8,6 @@ from posixpath import split
 from this import s
 import time
 import datetime
-from typing_extensions import Self
 from uuid import getnode as get_mac
 import sys,subprocess
 import os
@@ -58,6 +57,7 @@ class Node:
         self.ElliderLoLLama=False
         self.sistemaEstable=False
         self.finishCountDown=False
+        
 
         #Todo Nodo debe saber si es el lider , en caso de que lo sea debe realizar acciones especificas
         # self.fingertable = {((self._id+(i**2))%2**160) : self._ip for i in range(160)} #!ID:IP
@@ -69,7 +69,7 @@ class Node:
        #for peticion in self.peticiones:
         # if peticio
 
-    def countdown(self,num_of_secs):
+    def countdown(self,num_of_secs):  #Temporizador que marca la revision de estabilidad del sistema
      while num_of_secs:
         m, s = divmod(num_of_secs, 60)
         min_sec_format = '{:02d}:{:02d}'.format(m, s)
@@ -88,9 +88,10 @@ class Node:
          if keys.__contains__(id):
             s.connect(self.listaDNodos[self.fingertable[id]],8008)
             s.send(b"dame archivo")
-            s.send("{}".format(hash))           
-            ##Recibir Archivo
+            s.send("{}".format(hash))
+            archivo=s.recv(1024*5)
             s.close()
+            return archivo
          else:
              idNodos= self.fingertable.values()
              pos=len(idNodos)-1
@@ -105,15 +106,17 @@ class Node:
              s.connect(self.listaDNodos[value],8008)
              s.send(b"busca archivo")
              s.send("{}".format(id))
-             request=s.recv(1024)
-      else:
+             s.send("{}".format(hash))
+             return s.recv(1024).decode('utf-8')
+      elif TipoDBusqueda=="Edicion":
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s: 
          keys=self.fingertable.keys()
          if keys.__contains__(id):
             s.connect(self.listaDNodos[self.fingertable[id]],8008)
             s.send(b"edita archivo")
+            s.send("{}".format(str(id)))
             s.send("{}".format(hash))
-            #Mandar el nuevo archivo           
+            s.sendfile(archivo)           
             s.close()
          else:
              idNodos= self.fingertable.values()
@@ -130,17 +133,23 @@ class Node:
              s.send(b"busca archivo para edicion")
              s.send("{}".format(id))
              s.send("{}".format(hash))
-             s.send("{}".format(archivo))
+             s.sendfile(archivo)
              
 
-    def ejecutaDescarga(archivo,idArchivo,self):
-             
-           codigoHash=hashlib.sha256(archivo).hexdigest()
+    def ejecutaDescarga(idArchivo,self):
+           codigoHash=idArchivo
+           id=""
+           while codigoHash[0]!=",":
+                  id+=codigoHash[0]
+                  codigoHash=codigoHash[1:len(codigoHash)-1]
+           codigoHash=codigoHash[1:len(codigoHash)-1]
+           
            if self._archivos.count(codigoHash)==1:
-               ####Busca el archivo y retornarlo
-               return archivo
+               with open(codigoHash, 'rb') as f:
+                return f
+           
            else:
-             return self.buscaArchivo(codigoHash,None,idArchivo,"Descarga")
+             return self.buscaArchivo(codigoHash,None,id,"Descarga")
            
 
     def recibePeticionesdelSistema(self):
@@ -159,64 +168,72 @@ class Node:
             elif data=="dame sucesor":
                  conn.send("{}".format(self._sucesor))
             elif data=="Save":
-                 #######Aqui hay que recibir el archivo y guardarlo
-                 ##if se guarda bien entonces
-                 hashdelArchivo= hashlib.sha256().hexdigest()
-                 self._archivos.append(hashdelArchivo)
-                 self._archivosDelSistema.setdefault(hashdelArchivo,[])
+                 archivo=conn.recv(1024*5).decode('utf-8')
+                 hash=hashlib.sha256(archivo).hexdigest()
+                 with open(hash, "wb") as file:
+                    file.write(archivo)
+                 self._archivos.append(hash)
+                 self._archivosDelSistema.setdefault(hash,[])
                  conn.send(b"Save")
-                 #ELse:
-                 conn.send("")
+                 conn.send(str(self._id)+","+hash)
             elif data=="Actualiza Archivos":
                   data=conn.recv(1024).decode('utf-8')
                   self._archivosDelSistema.keys= json.loads(data)
                   data=conn.recv(1024).decode('utf-8')
                   self._archivosDelSistema.values= json.loads(data)
             elif data=="edita archivo":
-                  hashAntiguo=conn.recv(1024).decode('utf-8')
-                  archivo=None                  
+                  id=conn.recv(1024).decode('utf-8')
+                  hash=conn.recv(1024).decode('utf-8')
+                  idArchivo=id+","+hash
+                  archivo=conn.recv(1024*5).decode('utf-8')
+                  os.remove(idArchivo)
+                  hashArchivoNuevo=hashlib.sha256(archivo).hexdigest()
+                  with open(str(self.id)+","+hashArchivoNuevo, "wb") as file:
+                    file.write(archivo)
+                  
                   ###Editar el archivo y donde quiera que este replicado 
                   #Eliminar El archivo , Guardar EL actual e informar a los demas nodos que lo tienen
-                  self._archivosDelSistema.setdefault(None,self._archivosDelSistema[hashAntiguo])    #anadir el nuevo hash junto a la lista de ips donde esta el archivo
-                  self._archivosDelSistema[hashAntiguo]=None  #Aqui debe ser igual al hashdelnuevoarchivo
-                  self._archivos.remove(hashAntiguo)
-                  self._archivos.append(None) ##Anadir el nuevo hash
+                  self._archivosDelSistema.setdefault(hashArchivoNuevo,self._archivosDelSistema[hash])    #anadir el nuevo hash junto a la lista de ips donde esta el archivo
+                  self._archivos.remove(hash)
+                  self._archivos.append(hashArchivoNuevo) ##Anadir el nuevo hash
                   
-
                   with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s: 
-                   for replica in self._archivosDelSistema[hashAntiguo]:
+                   for replica in self._archivosDelSistema[hash]:
                     if replica!=self._ip:
                      if controlDNodos[self.listaDNodos.index(replica)]==True:
                          s.connect(replica,8008)
                          s.send(b"edita replica")
-                         s.send(hashAntiguo)
-                         s.send(archivo)######Enviar archivo
+                         s.send(hash)
+                         s.sendfile(archivo)
 
                   self._archivos.append(hash)
+                  self._archivosDelSistema[hash]=hashArchivoNuevo
             elif data=="edita replica":
-                  hashAntiguo=conn.recv(1024).decode('utf-8')  
-                  archivo=None                  
-                  ###Editar el archivo y donde quiera que este replicado 
-                  #Eliminar El archivo , Guardar EL actual e informar a los demas nodos que lo tienen
-                  self._archivosDelSistema.setdefault(None,self._archivosDelSistema[hashAntiguo])    #anadir el nuevo hash junto a la lista de ips donde esta el archivo
-                  self._archivosDelSistema[hashAntiguo]=None  #Aqui debe ser igual al hashdelnuevoarchivo
-                  self._archivos.remove(hashAntiguo)
-                  self._archivos.append(None) ##anadir el nuevo hash
+                  hash=conn.recv(1024).decode('utf-8')  
+                  archivo=conn.recv(1024)
+                  hashArchivoNuevo=hashlib.sha256(archivo).hexdigest()
+                  with open(self._id+","+hashArchivoNuevo, "wb") as file:
+                    file.write(archivo)
+                  self._archivosDelSistema[hash]=hashArchivoNuevo  
+                  self._archivosDelSistema.setdefault(hashArchivoNuevo,self._archivosDelSistema[hash])   
+                  self._archivos.remove(hash)
+                  self._archivos.append(hashArchivoNuevo) 
 
             elif data=="busca archivo":
                   id=int(conn.recv(1024).decode('utf-8'))
                   hash=conn.recv(1024).decode('utf-8')
-                  archivo=self.buscaArchivo(id,hash)
-                  ###Mandar el archivo  conn.sendfile
+                  archivo=self.buscaArchivo(hash,None,id,"Descarga")
+                  conn.sendfile(archivo)
             elif data=="busca archivo para edicion":
                   id=int(conn.recv(1024).decode('utf-8'))
                   hash=conn.recv(1024).decode('utf-8')
-                  archivo=None  ##Recibir el archivo de alguna forma
-                  self.buscaArchivo(id,hash,archivo,"Edicion")
+                  archivo=conn.recv(1024).decode('utf-8')  ##Recibir el archivo de alguna forma
+                  self.buscaArchivo(hash,archivo,id,"Edicion")
                   ###Mandar el archivo  conn.sendfile
             elif data=="dame archivo":
-                  ##Retorna el archivo con el hash
-                  return True
+                  codigoHash=conn.recv(1024).decode('utf-8')
+                  with open(codigoHash, 'rb') as f:
+                   conn.sendfile(f)
             elif data=="actualiza Info":
                   hash=conn.recv(1024).decode('utf-8')
                   data=conn.recv(1024).decode('utf-8')
@@ -257,7 +274,6 @@ class Node:
                if not data.decode('utf-8')=="Save":
                    return False
                idDNodoARetornar=int(s.recv(1024).decode('utf-8'))
-               
                s.close()
                NodosDondeEstaElarchivo=[]
                hashdelArchivo= hashlib.sha256(archivo).hexdigest()
@@ -310,21 +326,31 @@ class Node:
                 s.close()
              i+=1
 
-    def ejecutaEdicion(self,archivo,archivonuevo,id):
-          hashAntiguo=hashlib.sha256(archivo).hexdigest()
-          hashNuevo=hashlib.sha256(archivonuevo).hexdigest()
-          self.buscaArchivo(hashAntiguo,hashNuevo,id,"Edicion")
+    def ejecutaEdicion(self,idArchivo,archivonuevo):
+          codigoHash=idArchivo
+          id=""
+          while codigoHash[0]!=",":
+                  id+=codigoHash[0]
+                  codigoHash=codigoHash[1:len(codigoHash)-1]
+          codigoHash=codigoHash[1:len(codigoHash)-1]
+          
+          self.buscaArchivo(codigoHash,archivonuevo,id,"Edicion")
 
     def procesapeticiones(self):
 
+      idParaPeticion=0
       threading.Thread(target=self.countdown(), args=()).start()   #Este temporizador es para mirar estabilizar el sistema cada un tiempo determinado
       threading.Thread(target=self.recibePeticionesdelSistema(), args=()).start()
       
       while SistemaEstable and not self.finishCountDown:
          
          if self._ip==self._ipLider:
-           if len(self.peticiones)>0:
+           
+           while len(self.peticiones)>0:
+               
+
              peticion=self.peticiones[0]
+             
              if peticion=="subir":
                 self.ejecutaSubida(peticion)
                 self.actualizaNodosDSistema()
@@ -366,27 +392,29 @@ class Node:
               conn.close()
   
     def buscalider(self):
-         threading.Thread(target=self.conectaNodosIndep(), args=()).start()
+         
+         #threading.Thread(target=self.conectaNodosIndep(), args=()).start()
+         
          ip=self._ip
          number=''
          while ip[len(ip)-1]!='.':
             number=ip[len(ip)-1]+number
-            ip=ip[0:len(ip)-2]
+            ip=ip[0:len(ip)-1]
          number=int(number)
          pos=2
-         while pos<=number:
-           if pos==number:
-                 self._ipLider=self._ip
-                 self.id=0
-                 self.listaDNodos.append(self._ip)
-                 controlDNodos.append(True)
-                 self._sucesor=self._ip
-                 self._predecesor=self._ip
+        # while pos<=number:
+         #  if pos==number:
+         #        self._ipLider=self._ip
+         #        self.id=0
+         #        self.listaDNodos.append(self._ip)
+         #        controlDNodos.append(True)
+         #        self._sucesor=self._ip
+         #        self._predecesor=self._ip
 
-           if check_ping(ip+str(pos)):
-              break
-           pos+=1   
-#
+        #   if check_ping(ip+str(pos)):
+         #     break
+          # pos+=1   
+         self._ipLider=self._ip
     def run(self):  
       
      while True:
@@ -400,7 +428,7 @@ class Node:
           self.sistemaEstable=True
        elif self._ipLider==None:
               threading.Thread(target=self.recibiendoSenalDlider, args=()).start()
-              temporizador=7
+              temporizador=1
               while True:
                 if self.ElliderLoLLama:
                   break
@@ -445,7 +473,7 @@ class Node:
     
        ip=self._ip
        while ip[len(ip)-1]!='.':
-          ip=ip[0:len(ip)-2]
+          ip=ip[0:len(ip)-1]
        
        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s: 
          for i in range(2,255):
@@ -583,10 +611,11 @@ class Node:
                   if self._archivos.count(COMMAND)==1:
                      conn.send(b"Esta")
                   else:
-                     archivo=None ##CargarArchivo
-                     ##conn.sendfile mandar el archivo
+                     archivo=self._archivosDelSistema[COMMAND][0] ##CargarArchivo
+                     with open(str(self.id)+archivo,'rb') as file:
+                       conn.sendfile(file)
                      NodosEnLosQueEsta= json.dumps(self._archivosDelSistema[archivo]) ##Indexar en el hash del archivo
-                     conn.send(NodosEnLosQueEsta.encode('utf-8'))
+                     conn.send(NodosEnLosQueEsta)
                      
                      
          elif COMMAND.decode('utf-8')=="JOIN":
@@ -609,10 +638,11 @@ class Node:
                               s.send(archivo)
                               data=s.recv(1024).decode('utf-8')
                               if data!="Esta":
-                                  #Eliminar el archivo con este hash
-                                  #s.recv() recibe archivo nuevo
-                                  #Guardarlo
-                                  hash=None
+                                  os.remove(str(self.id)+","+archivo)
+                                  archivo=s.recv(1024*5)
+                                  hash=hashlib.sha256(archivo).hexdigest()
+                                  with open(str(self.id)+","+hash, "wb") as file:
+                                     file.write(archivo)
                                   nodosEnlosqueEsta=json.loads(s.recv(1024).decode('utf-8'))
                                   nuevosArchivos.append(data)
                                   self._archivosDelSistema.setdefault(data,nodosEnlosqueEsta)
@@ -622,11 +652,9 @@ class Node:
 
                               
                         self._archivos=nuevosArchivos
-                        
-
-
+                  else:
+                    self.creaFingertable()
                              
-
          elif COMMAND.decode('utf-8')=="UpdateFingertables":
                   for i in range(6):
                    id=pow(2,i)+self._id
