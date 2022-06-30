@@ -41,6 +41,9 @@ class chord_protocol():
     def get_predecessor():
         return b"1009: Get Predecessor"
     
+    def get_replica():
+        return b"1010: Get Replica"
+    
     def ok():
         return b"2000: OK"
     
