@@ -3,637 +3,543 @@ from errno import ELIBBAD
 import hashlib
 from multiprocessing.sharedctypes import Value
 import os
-import csv
 from posixpath import split
 from this import s
 import time
-import datetime
-from uuid import getnode as get_mac
-import sys,subprocess
+from uuid import getnode
 import os
 import socket
 import json
 import threading
-from subprocess import Popen, PIPE 
-import re
-import redis
+from subprocess import Popen, PIPE
+from requests import request 
 from setuptools import Command 
 from ping3 import ping
-
-
+from Accessories.search_type import Search_Type
+from Accessories.chord_communication_protocol import chord_protocol
 
 #Si el nodo i de la red esta activo se guarda True, esta lista servira para comprobar constantemente 
 # si un nodo se desactivo o si un nodo se activo
-controlDNodos=[]
-SistemaEstable=True
+node_control=[]
+stabilized_system=True
 
 #esta variable es para saber el estado en que se encuentra chord , si buscando un elemento , si anadiendo un elemento o si esta reorganizando
 #los nodos
-estadoDChord=None
+chord_status=None
 
 
-def check_ping(hostname):
-  resp=ping(hostname)
-  if resp==False or resp==None:
-    return False
-  else:
-    return True
+def check_ping(host_name):
+    ans=ping(host_name)
+    if ans==False or ans==None:
+        return False
+    else:
+        return True
 
-#Recordar pasar la peticiones a los demas nodos por si el lider se cae
+#Recordar pasar la requests a los demas nodos por si el lider se cae
 
 class Node:
     def __init__(self,ip):
-        self._id=None
-        self._ip=ip
-        self._archivos=list()  #se guardaran los archivos que esten almacenados en este nodo , mas alla que sea una replica . 
-        self._archivosDelSistema=dict()  #Aqui se guardara el hash del archivo y en que otros nodos esta
-        self._predecesor=None
-        self._sucesor=None
-        self.fingertable=dict()
-        self._ipLider=None
-        self.hayLider=False
-        self.listaDNodos=[]
-        self.peticiones=[]  # aqui se guardan las peticiones de los clientes
-        self.ElliderLoLLama=False
-        self.sistemaEstable=False
-        self.finishCountDown=False
+        self.__id=None
+        self.__ip=ip
+        self.__files=list()  #se guardaran los archivos que esten almacenados en este nodo , mas alla que sea una replica . 
+        self.__files_system=dict()  #Aqui se guardara el hash del archivo y en que otros nodos esta
+        self.__predecessor=None
+        self.__successor=None
+        self.finger_table=dict()
+        self.__ip_boss=None
+        self.there_boss=False
+        self.node_list=[]
+        self.requests=[]  # aqui se guardan las requests de los clientes
+        self.leader_calls=False
+        self.stabilized_system=False
+        self.finish_countdown=False
         
 
         #Todo Nodo debe saber si es el lider , en caso de que lo sea debe realizar acciones especificas
-        # self.fingertable = {((self._id+(i**2))%2**160) : self._ip for i in range(160)} #!ID:IP
+        # self.finger_table = {((self.__id+(i**2))%2**160) : self.__ip for i in range(160)} #!ID:IP
 
     #def agregarpeticion(self):
-     #  self.peticiones
+      #  self.requests
 
     #def procesapeticion(self):
-       #for peticion in self.peticiones:
+        #for peticion in self.requests:
         # if peticio
 
-    def countdown(self,num_of_secs):  #Temporizador que marca la revision de estabilidad del sistema
-     while num_of_secs:
-        m, s = divmod(num_of_secs, 60)
-        min_sec_format = '{:02d}:{:02d}'.format(m, s)
-        print(min_sec_format, end='/r')
-        time.sleep(1)
-        num_of_secs -= 1
+    '''
+        Actions
+    '''
+    def find_file(self,hash,file,id,search_type: Search_Type):
+        if search_type == Search_Type.DOWNLOAD:  
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s: 
+                keys=self.finger_table.keys()
+                if keys.__contains__(id):
+                    s.connect(self.node_list[self.finger_table[id]],8008)
+                    s.send(chord_protocol.get_file())
+                    s.send("{}".format(hash))
+                    file=s.recv(1024*5)
+                    s.close()
+                    return file
+                else:
+                    id_nodes= self.finger_table.values()
+                    pos=len(id_nodes)-1
+                    value=id_nodes[pos]
+                    while True:
+                        if value<id:
+                            break
+                        else:
+                            pos-=1
+                            value=id_nodes[pos]
+                      
+                s.connect(self.node_list[value],8008)
+                s.send(chord_protocol.search_file())
+                s.send("{}".format(id))
+                s.send("{}".format(hash))
+                return s.recv(1024).decode('utf-8')
+        elif search_type == Search_Type.EDIT:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s: 
+                keys=self.finger_table.keys()
+                if keys.__contains__(id):
+                    s.connect(self.node_list[self.finger_table[id]],8008)
+                    s.send(chord_protocol.edit_file())
+                    s.send("{}".format(str(id)))
+                    s.send("{}".format(hash))
+                    s.sendfile(file)           
+                    s.close()
+                else:
+                    id_nodes= self.finger_table.values()
+                    pos=len(id_nodes)-1
+                    value=id_nodes[pos]
+                    while True:
+                        if value<id:
+                            break
+                        else:
+                            pos-=1
+                            value=id_nodes[pos]
+                          
+                    s.connect(self.node_list[value],8008)
+                    s.send(chord_protocol.search_for_edit_file())
+                    s.send("{}".format(id))
+                    s.send("{}".format(hash))
+                    s.sendfile(file)
+              
+    def download_file(file_id,self):
+        hash_code = file_id
+        id = ""
+        while hash_code[0]!=",":
+            id += hash_code[0]
+            hash_code = hash_code[1:len(hash_code)-1]
+        hash_code = hash_code[1:len(hash_code)-1]
         
-     self.finishCountDown=True
-        
-
-    def buscaArchivo(self,hash,archivo,id,TipoDBusqueda):
-      if TipoDBusqueda=="Descarga":  
-      
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s: 
-         keys=self.fingertable.keys()
-         if keys.__contains__(id):
-            s.connect(self.listaDNodos[self.fingertable[id]],8008)
-            s.send(b"dame archivo")
-            s.send("{}".format(hash))
-            archivo=s.recv(1024*5)
-            s.close()
-            return archivo
-         else:
-             idNodos= self.fingertable.values()
-             pos=len(idNodos)-1
-             value=idNodos[pos]
-             while True:
-                 if value<id:
-                   break
-                 else:
-                    pos-=1
-                    value=idNodos[pos]
-                   
-             s.connect(self.listaDNodos[value],8008)
-             s.send(b"busca archivo")
-             s.send("{}".format(id))
-             s.send("{}".format(hash))
-             return s.recv(1024).decode('utf-8')
-      elif TipoDBusqueda=="Edicion":
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s: 
-         keys=self.fingertable.keys()
-         if keys.__contains__(id):
-            s.connect(self.listaDNodos[self.fingertable[id]],8008)
-            s.send(b"edita archivo")
-            s.send("{}".format(str(id)))
-            s.send("{}".format(hash))
-            s.sendfile(archivo)           
-            s.close()
-         else:
-             idNodos= self.fingertable.values()
-             pos=len(idNodos)-1
-             value=idNodos[pos]
-             while True:
-                 if value<id:
-                   break
-                 else:
-                    pos-=1
-                    value=idNodos[pos]
-                   
-             s.connect(self.listaDNodos[value],8008)
-             s.send(b"busca archivo para edicion")
-             s.send("{}".format(id))
-             s.send("{}".format(hash))
-             s.sendfile(archivo)
-             
-
-    def ejecutaDescarga(idArchivo,self):
-           codigoHash=idArchivo
-           id=""
-           while codigoHash[0]!=",":
-                  id+=codigoHash[0]
-                  codigoHash=codigoHash[1:len(codigoHash)-1]
-           codigoHash=codigoHash[1:len(codigoHash)-1]
-           
-           if self._archivos.count(codigoHash)==1:
-               with open(codigoHash, 'rb') as f:
+        if self.__files.count(hash_code)==1:
+            with open(hash_code, 'rb') as f:
                 return f
-           
-           else:
-             return self.buscaArchivo(codigoHash,None,id,"Descarga")
-           
-
-    def recibePeticionesdelSistema(self):
-        server = socket.socket(
-               socket.AF_INET, socket.SOCK_STREAM)
-          
-        server.bind((self._ip,8008))
+        else:
+            return self.find_file(hash_code, None, id, Search_Type.DOWNLOAD)
+    
+    def upload_file(self, file):  #Este metodo escoge el nodo que lo almacenara y le envia un mensaje para que lo guarde
+        if self.__files.count(hashlib.sha256(file).hexdigest())==0:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s: 
+                ip=None
+                count_files=0
+                count=0
+                for node in self.node_list:
+                    if node_control[count]==True:
+                        try:
+                            s.connect(node,8008)
+                            s.send(b"Archivos")
+                            data=s.recv(1024)
+                            if count==0:
+                                ip = node
+                                count_files= int(data.decode('utf-8'))
+                            elif int(data.decode('utf-8'))<count_files:
+                                ip = node
+                                count_files=int(data.decode('utf-8'))
+                        except:
+                            stabilized_system=False
+                            return False
+                    count+=1
+                    s.close()
+                try:
+                    s.connect(ip,8008)
+                    s.send(chord_protocol.save_file())
+                    s.sendfile(file)
+                    data=s.recv(1024)
+                    if not data.decode('utf-8') == chord_protocol.save_file():
+                        return False
+                    id_node_return=int(s.recv(1024).decode('utf-8'))
+                    s.close()
+                    nodes_where_the_file_is=[]
+                    file_hash= hashlib.sha256(file).hexdigest()
+                    self.__files.append(file_hash)
+                    nodes_where_the_file_is.append(ip)
+                    self.__files_system.setdefault(file_hash,[ip])
+                    count_replicas=4
+                    while count_replicas>0:#Replicacion
+                        s.connect(ip,8008)
+                        s.send(chord_protocol.get_successor())
+                        data=s.recv(1024)
+                        ip=data.decode('utf-8')
+                        s.close()
+                        s.connect(ip,8008)
+                        s.send(chord_protocol.save_file())          #Hacer que los nodos confirmen cuando hayan realizado el almacenamiento
+                        s.sendfile(file)
+                        data=s.recv(1024)
+                        if not data.decode('utf-8')==chord_protocol.save_file():
+                            return False
+                        nodes_where_the_file_is.append(ip)
+                        s.close()
+                        count_replicas-=1
+                        for ip in nodes_where_the_file_is:
+                            s.connect(ip,8008)
+                            s.send(chord_protocol.update_info())
+                            s.send(file_hash)
+                            s.send(json.dumps(nodes_where_the_file_is))
+                            s.close()        
+                except:
+                    stabilized_system=False
+                    return False
+                return id_node_return
+        else:
+            return False
+    
+    def edit_file(self, file_id, new_file):
+        hash_code = file_id
+        id=""
+        while hash_code[0]!=",":
+            id+=hash_code[0]
+            hash_code=hash_code[1:len(hash_code)-1]
+        hash_code=hash_code[1:len(hash_code)-1]
+        
+        self.find_file(hash_code, new_file, id, Search_Type.EDIT)
+    
+    def get_requests_system(self):
+        server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        server.bind((self.__ip,8008))
         server.listen()
         conn, addr = server.accept()
         if conn:
             data=conn.recv(1024)
             data=data.decode('utf-8')
-            if data=='Inestable' and self.listaDNodos.count(addr[0])==1 and controlDNodos[self.listaDNodos.index(addr[0])]==True:
+            if data=='Inestable' and self.node_list.count(addr[0])==1 and node_control[self.node_list.index(addr[0])]==True:
                 SystemaEstable=False
                 conn.close()
             elif data=="dame sucesor":
-                 conn.send("{}".format(self._sucesor))
+                conn.send("{}".format(self.__successor))
             elif data=="Save":
-                 archivo=conn.recv(1024*5).decode('utf-8')
-                 hash=hashlib.sha256(archivo).hexdigest()
-                 with open(hash, "wb") as file:
-                    file.write(archivo)
-                 self._archivos.append(hash)
-                 self._archivosDelSistema.setdefault(hash,[])
-                 conn.send(b"Save")
-                 conn.send(str(self._id)+","+hash)
+                file_text=conn.recv(1024*5).decode('utf-8')
+                hash=hashlib.sha256(file_text).hexdigest()
+                with open(hash, "wb") as file:
+                    file.write(file_text)
+                self.__files.append(hash)
+                self.__files_system.setdefault(hash,[])
+                conn.send(b"Save")
+                conn.send(str(self.__id)+","+hash)
             elif data=="Actualiza Archivos":
-                  data=conn.recv(1024).decode('utf-8')
-                  self._archivosDelSistema.keys= json.loads(data)
-                  data=conn.recv(1024).decode('utf-8')
-                  self._archivosDelSistema.values= json.loads(data)
+                data=conn.recv(1024).decode('utf-8')
+                self.__files_system.keys= json.loads(data)
+                data=conn.recv(1024).decode('utf-8')
+                self.__files_system.values= json.loads(data)
             elif data=="edita archivo":
-                  id=conn.recv(1024).decode('utf-8')
-                  hash=conn.recv(1024).decode('utf-8')
-                  idArchivo=id+","+hash
-                  archivo=conn.recv(1024*5).decode('utf-8')
-                  os.remove(idArchivo)
-                  hashArchivoNuevo=hashlib.sha256(archivo).hexdigest()
-                  with open(str(self.id)+","+hashArchivoNuevo, "wb") as file:
-                    file.write(archivo)
-                  
-                  ###Editar el archivo y donde quiera que este replicado 
-                  #Eliminar El archivo , Guardar EL actual e informar a los demas nodos que lo tienen
-                  self._archivosDelSistema.setdefault(hashArchivoNuevo,self._archivosDelSistema[hash])    #anadir el nuevo hash junto a la lista de ips donde esta el archivo
-                  self._archivos.remove(hash)
-                  self._archivos.append(hashArchivoNuevo) ##Anadir el nuevo hash
-                  
-                  with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s: 
-                   for replica in self._archivosDelSistema[hash]:
-                    if replica!=self._ip:
-                     if controlDNodos[self.listaDNodos.index(replica)]==True:
-                         s.connect(replica,8008)
-                         s.send(b"edita replica")
-                         s.send(hash)
-                         s.sendfile(archivo)
+                id=conn.recv(1024).decode('utf-8')
+                hash=conn.recv(1024).decode('utf-8')
+                file_id=id+","+hash
+                file_text=conn.recv(1024*5).decode('utf-8')
+                os.remove(file_id)
+                hash_new_file=hashlib.sha256(file_text).hexdigest()
+                with open(str(self.id)+","+hash_new_file, "wb") as file:
+                    file.write(file_text)
+                
+                ###Editar el archivo y donde quiera que este replicado 
+                #Eliminar El archivo , Guardar EL actual e informar a los demas nodos que lo tienen
+                self.__files_system.setdefault(hash_new_file,self.__files_system[hash])    #anadir el nuevo hash junto a la lista de ips donde esta el archivo
+                self.__files.remove(hash)
+                self.__files.append(hash_new_file) ##Anadir el nuevo hash
+                
+                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s: 
+                    for replica in self.__files_system[hash]:
+                        if replica!=self.__ip:
+                            if node_control[self.node_list.index(replica)]==True:
+                                s.connect(replica,8008)
+                                s.send(b"edita replica")
+                                s.send(hash)
+                                s.sendfile(file_text)
 
-                  self._archivos.append(hash)
-                  self._archivosDelSistema[hash]=hashArchivoNuevo
+                self.__files.append(hash)
+                self.__files_system[hash]=hash_new_file
             elif data=="edita replica":
-                  hash=conn.recv(1024).decode('utf-8')  
-                  archivo=conn.recv(1024)
-                  hashArchivoNuevo=hashlib.sha256(archivo).hexdigest()
-                  with open(self._id+","+hashArchivoNuevo, "wb") as file:
-                    file.write(archivo)
-                  self._archivosDelSistema[hash]=hashArchivoNuevo  
-                  self._archivosDelSistema.setdefault(hashArchivoNuevo,self._archivosDelSistema[hash])   
-                  self._archivos.remove(hash)
-                  self._archivos.append(hashArchivoNuevo) 
-
+                hash=conn.recv(1024).decode('utf-8')  
+                file_text=conn.recv(1024)
+                hash_new_file=hashlib.sha256(file_text).hexdigest()
+                with open(self.__id+","+hash_new_file, "wb") as file:
+                    file.write(file_text)
+                self.__files_system[hash]=hash_new_file  
+                self.__files_system.setdefault(hash_new_file, self.__files_system[hash])   
+                self.__files.remove(hash)
+                self.__files.append(hash_new_file) 
             elif data=="busca archivo":
-                  id=int(conn.recv(1024).decode('utf-8'))
-                  hash=conn.recv(1024).decode('utf-8')
-                  archivo=self.buscaArchivo(hash,None,id,"Descarga")
-                  conn.sendfile(archivo)
+                id=int(conn.recv(1024).decode('utf-8'))
+                hash=conn.recv(1024).decode('utf-8')
+                archivo=self.find_file(hash,None,id,"Descarga")
+                conn.sendfile(archivo)
             elif data=="busca archivo para edicion":
                   id=int(conn.recv(1024).decode('utf-8'))
                   hash=conn.recv(1024).decode('utf-8')
                   archivo=conn.recv(1024).decode('utf-8')  ##Recibir el archivo de alguna forma
-                  self.buscaArchivo(hash,archivo,id,"Edicion")
-                  ###Mandar el archivo  conn.sendfile
+                  self.find_file(hash,archivo,id,"Edicion")
+                ###Mandar el archivo  conn.sendfile
             elif data=="dame archivo":
-                  codigoHash=conn.recv(1024).decode('utf-8')
-                  with open(codigoHash, 'rb') as f:
-                   conn.sendfile(f)
+                hash_code=conn.recv(1024).decode('utf-8')
+                with open(hash_code, 'rb') as f:
+                  conn.sendfile(f)
             elif data=="actualiza Info":
-                  hash=conn.recv(1024).decode('utf-8')
-                  data=conn.recv(1024).decode('utf-8')
-                  data=json.loads(data)
-                  self._archivosDelSistema.setdefault(hash,data)
-                  return True
+                hash=conn.recv(1024).decode('utf-8')
+                data=conn.recv(1024).decode('utf-8')
+                data=json.loads(data)
+                self.__files_system.setdefault(hash,data)
+                return True
         conn.close()
 
-
-    def ejecutaSubida(self,archivo):  #Este metodo escoge el nodo que lo almacenara y le envia un mensaje para que lo guarde
-          if self._archivos.count(hashlib.sha256(archivo).hexdigest())==0:
-           with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s: 
-             ip=None
-             cantidadDArchivos=0
-             count=0
-             for nodo in self.listaDNodos:
-                if controlDNodos[count]==True:
-                   try:
-                    s.connect(nodo,8008)
-                    s.send(b"Archivos")
-                    data=s.recv(1024)
-                    if count==0:
-                       ip=nodo
-                       cantidadDArchivos= int(data.decode('utf-8'))
-                    elif int(data.decode('utf-8'))<cantidadDArchivos:
-                        ip=nodo
-                        cantidadDArchivos=int(data.decode('utf-8'))
-                   except:
-                     SistemaEstable=False
-                     return False
-                count+=1
-                s.close()
-             try:
-               s.connect(ip,8008)
-               s.send(b'Save')
-               s.sendfile(archivo)
-               data=s.recv(1024)
-               if not data.decode('utf-8')=="Save":
-                   return False
-               idDNodoARetornar=int(s.recv(1024).decode('utf-8'))
-               s.close()
-               NodosDondeEstaElarchivo=[]
-               hashdelArchivo= hashlib.sha256(archivo).hexdigest()
-               self._archivos.append(hashdelArchivo)
-               NodosDondeEstaElarchivo.append(ip)
-               self._archivosDelSistema.setdefault(hashdelArchivo,[ip])
-               cantidadDReplicas=4
-               while cantidadDReplicas>0:#Replicacion
-                s.connect(ip,8008)
-                s.send(b'dame sucesor')
-                data=s.recv(1024)
-                ip=data.decode('utf-8')
-                s.close()
-                s.connect(ip,8008)
-                s.send(b'Save')          #Hacer que los nodos confirmen cuando hayan realizado el almacenamiento
-                s.sendfile(archivo)
-                data=s.recv(1024)
-                if not data.decode('utf-8')=="Save":
-                   return False
-                NodosDondeEstaElarchivo.append(ip)
-                s.close()
-                cantidadDReplicas-=1
-               for ip in NodosDondeEstaElarchivo:
-                 s.connect(ip,8008)
-                 s.send("actualiza Info")
-                 s.send(hashdelArchivo)
-                 s.send(json.dumps(NodosDondeEstaElarchivo))
-                 s.close()        
-
-             except:
-                SistemaEstable=False
-                return False
-            
-             return idDNodoARetornar
-
-          else:
-            print("El archivo ya existe en el sistema")
-
-    def actualizaNodosDSistema(self):
-          i=0
-          with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s: 
-           for nodo in self.listaDNodos:
-             if controlDNodos[i]==True:
-                s.connect(nodo,8008)
-                s.send(b'Actualiza Archivos')
-                send_list=json.dumps(self._archivosDelSistema.keys())
-                s.send(b"{}".__format__(send_list.encode('utf-8')))
-                send_list=json.dumps(self._archivosDelSistema.values())
-                s.send(b"{}".__format__(send_list.encode('utf-8')))
-                s.close()
-             i+=1
-
-    def ejecutaEdicion(self,idArchivo,archivonuevo):
-          codigoHash=idArchivo
-          id=""
-          while codigoHash[0]!=",":
-                  id+=codigoHash[0]
-                  codigoHash=codigoHash[1:len(codigoHash)-1]
-          codigoHash=codigoHash[1:len(codigoHash)-1]
-          
-          self.buscaArchivo(codigoHash,archivonuevo,id,"Edicion")
-
-    def procesapeticiones(self):
-
-      idParaPeticion=0
+    def processes_request(self):
       threading.Thread(target=self.countdown(), args=()).start()   #Este temporizador es para mirar estabilizar el sistema cada un tiempo determinado
-      threading.Thread(target=self.recibePeticionesdelSistema(), args=()).start()
+      threading.Thread(target=self.get_requests_system(), args=()).start()
       
-      while SistemaEstable and not self.finishCountDown:
-         
-         if self._ip==self._ipLider:
-           
-           while len(self.peticiones)>0:
-               
+      while stabilized_system and not self.finish_countdown:
+          if self.__ip==self.__ip_boss:
+              while len(self.requests)>0:
+                  request=self.requests[0]
+                  if request=="subir":
+                      self.upload_file(request)
+                      self.update_nodes()
+                  if request=="descargar":
+                      self.download_file(request)
+                  if request=="editar":
+                      self.edit_file(request,request)       
 
-             peticion=self.peticiones[0]
-             
-             if peticion=="subir":
-                self.ejecutaSubida(peticion)
-                self.actualizaNodosDSistema()
-             if peticion=="descargar":
-               self.ejecutaDescarga(peticion)
-
-             if peticion=="editar":
-               self.ejecutaEdicion(peticion,peticion)       
-
-    def recepcionarpeticiones(self):
-            servidor = socket.socket(
-                socket.AF_INET, socket.SOCK_STREAM)
-            servidor.bind((self._ip,8007))
-            servidor.listen()
-            while True:
-             conn, addr = servidor.accept() # Establecemos la conexión con el cliente
-             data=conn.recv(1024)
-             self._peticiones.append(data)
-          
-    def creaFingertable(self):
-         for i in range(6):
-            key=self._id+pow(2,i)
-            self.fingertable.setdefault(key,key)
-         
-    def recibiendoSenalDlider(self):
-        SERVER_PORT= 8003  
-        self.server = socket.socket(
-               socket.AF_INET, socket.SOCK_STREAM)
-          
-        self.server.bind((self._ip,SERVER_PORT))
-        self.server.listen()
-        conn, addr = self.server.accept() # Establecemos la conexión con el cliente
-        if conn:
-             data=conn.recv(1024)
-             if data.decode('utf-8')=="Estas activo?":
-              conn.send(b'Nodo Soy FTP')
-              self.ElliderLoLLama=True
-              self._ipLider=addr[0]
-              conn.close()
-  
-    def buscalider(self):
-         
-         #threading.Thread(target=self.conectaNodosIndep(), args=()).start()
-         
-         ip=self._ip
-         number=''
-         while ip[len(ip)-1]!='.':
-            number=ip[len(ip)-1]+number
-            ip=ip[0:len(ip)-1]
-         number=int(number)
-         pos=2
-        # while pos<=number:
-         #  if pos==number:
-         #        self._ipLider=self._ip
-         #        self.id=0
-         #        self.listaDNodos.append(self._ip)
-         #        controlDNodos.append(True)
-         #        self._sucesor=self._ip
-         #        self._predecesor=self._ip
-
-        #   if check_ping(ip+str(pos)):
-         #     break
-          # pos+=1   
-         self._ipLider=self._ip
-    def run(self):  
-      
-     while True:
-      
-      if not self.sistemaEstable:
-
-       if self._ipLider==self._ip:
-         while self._ipLider==self._ip:
-          self.stabilize()
-          self.updatefingertables()
-          self.sistemaEstable=True
-       elif self._ipLider==None:
-              threading.Thread(target=self.recibiendoSenalDlider, args=()).start()
-              temporizador=1
-              while True:
-                if self.ElliderLoLLama:
-                  break
-                if temporizador==0:
-                  self.buscalider()
-                  break
-                else: 
-                   time.sleep(1)
-                   temporizador-=1
-        
-       elif not check_ping(self._ipLider):
-          self.hayLider=False
-          threading.Thread(target=self.esperaActualizacionDlider, args=()).start()
-          threading.Thread(target=self.seleccionalider, args=()).start()
-       else:
-          self.escucha()
-      else:
-          self.procesapeticiones()
-
-
-    def esperaActualizacionDlider(self):
-          SERVER_PORT = 8002
-
-          self.server = socket.socket(
-               socket.AF_INET, socket.SOCK_STREAM)
-          
-          self.server.bind((self._ip,SERVER_PORT))
-          self.server.listen()
-          while not self.hayLider:
-           conn, addr = self.server.accept() # Establecemos la conexión con el cliente
-           if conn:
+    def get_requests(self):
+        server = socket.socket(
+            socket.AF_INET, socket.SOCK_STREAM)
+        server.bind((self.__ip,8007))
+        server.listen()
+        while True:
+            conn, addr = server.accept() # Establecemos la conexión con el cliente
             data=conn.recv(1024)
-            if data.decode('utf-8')=="Soy lider d nodos":
-                hayLider=True
-                self._ipLider=addr[0]
-            elif data.decode('utf-8')=="Eres el lider":
-                self._ipLider=self._ip
-                hayLider=True     
-           conn.close()       
-            
-    def stabilize(self):
-    
-       ip=self._ip
-       while ip[len(ip)-1]!='.':
-          ip=ip[0:len(ip)-1]
-       
-       with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s: 
-         for i in range(2,255):
-           if self._ip!= ip+str(i): 
-              if self.listaDNodos.count(ip+str(i))==1:
-                 try:
-                    s.connect((ip+str(i), 8003))
-                    s.send(b"Estas activo?")
-                    data=s.recv(1024)
-                    if data.decode('utf-8')=="Nodo Soy FTP":
-                      if not controlDNodos[self.listaDNodos.index(ip+str(i))]:
-                         self.join(ip+str(i))
-                      else: 
-                       continue
-                    else:
-                      self.leave(self.listaDNodos.index(ip+str(i)))
-                    s.close()
-                 except:
-                    if controlDNodos[self.listaDNodos.index(ip)]:
-                     self.leave(self.listaDNodos.index(ip+str(i)))                    
-              elif check_ping(ip+str(i)):
-                      try :
-                        s.connect(ip+str(i),8003)
-                        s.send(b"Estas activo?")
-                        data=s.recv(1024)
-                        if data.decode('utf-8')=="Nodo Soy FTP":
-                            self.join(ip+str(i))
-                        s.close()
-                      except:
-                         s.close()
-                         continue
-              s.close()
+            self.requests.append(data)
 
-    def seleccionalider(self):
-         SERVER_PORT=8002
-         countpos=0
 
-         for ipnodo in self.listaDNodos:
-            if ipnodo==self._ip:
+    '''
+        Boss Operations
+    '''
+    def get_boss(self):
+        SERVER_PORT=8002
+        countpos=0
+
+        for ipnodo in self.node_list:
+            if ipnodo==self.__ip:
                 countpos+=1
                 with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                 while countpos<len(self.listaDNodos):
-                  try:
-                   s.connect((self.listaDNodos[countpos], SERVER_PORT))
-                   s.send(b"Soy lider d nodos")
-                   s.close()
-                   countpos+=1
-                  except:
-                     print("Hay que estabilizar antes de que sigan funcionando los demas nodos, hay al menos uno que se desconecto")
-                     
-                 s.connect((self._ip, SERVER_PORT))
-                 s.send(b"Eres el lider")
-                 s.close()
+                    while countpos<len(self.node_list):
+                        try:
+                            s.connect((self.node_list[countpos], SERVER_PORT))
+                            s.send(b"Soy lider d nodos")
+                            s.close()
+                            countpos+=1
+                        except:
+                            print("Hay que estabilizar antes de que sigan funcionando los demas nodos, hay al menos uno que se desconecto")
+                            
+                        s.connect((self.__ip, SERVER_PORT))
+                        s.send(b"Eres el lider")
+                        s.close()
 
             elif check_ping(ipnodo):
                 break
             countpos+=1
+    
+    def search_boss(self):
+        #threading.Thread(target=self.conectaNodosIndep(), args=()).start()
+        
+        ip=self.__ip
+        number=''
+        while ip[len(ip)-1]!='.':
+            number=ip[len(ip)-1]+number
+            ip=ip[0:len(ip)-1]
+        number=int(number)
+        pos=2
+        # while pos<=number:
+        #  if pos==number:
+        #        self.__ip_boss=self.__ip
+        #        self.id=0
+        #        self.node_list.append(self.__ip)
+        #        node_control.append(True)
+        #        self.__successor=self.__ip
+        #        self.__predecessor=self.__ip
+        #   if check_ping(ip+str(pos)):
+        #     break
+        # pos+=1   
+        self.__ip_boss=self.__ip
+    
+    def wait_update_boss(self):
+        SERVER_PORT = 8002
 
+        self.server = socket.socket(
+              socket.AF_INET, socket.SOCK_STREAM)
+        
+        self.server.bind((self.__ip,SERVER_PORT))
+        self.server.listen()
+        while not self.there_boss:
+            conn, addr = self.server.accept() # Establecemos la conexión con el cliente
+            if conn:
+                data=conn.recv(1024)
+                if data.decode('utf-8')=="Soy lider d nodos":
+                    there_boss=True
+                    self.__ip_boss=addr[0]
+                elif data.decode('utf-8')=="Eres el lider":
+                    self.__ip_boss=self.__ip
+                    there_boss=True     
+                conn.close()     
+    
+    def get_signal_boss(self):
+        SERVER_PORT= 8003  
+        self.server = socket.socket(
+            socket.AF_INET, socket.SOCK_STREAM)
+          
+        self.server.bind((self.__ip,SERVER_PORT))
+        self.server.listen()
+        conn, addr = self.server.accept() # Establecemos la conexión con el cliente
+        if conn:
+            data=conn.recv(1024)
+            if data.decode('utf-8')=="Estas activo?":
+                conn.send(b'Nodo Soy FTP')
+                self.leader_calls=True
+                self.__ip_boss=addr[0]
+                conn.close()
+    
+    
+    '''
+        Finger Table Operations
+    '''
+    def create_finger_table(self):
+        for i in range(6):
+            key=self.__id+pow(2,i)
+            self.finger_table.setdefault(key,key) 
+    
+    def update_finger_tables(self): #Luego poner el crear finger_tables  
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            for nodo in self.node_list:
+                if node_control[self.node_list.index(nodo)]:
+                    s.connect(nodo,8005)
+                    s.send(b"UpdateFingertables")
+                    data=s.recv(1024)
+    
+    
+    '''
+        Additional Actions
+    '''
+    def countdown(self,num_of_secs):  #Temporizador que marca la revision de estabilidad del sistema
+        while num_of_secs:
+            m, s = divmod(num_of_secs, 60)
+            min_sec_format = '{:02d}:{:02d}'.format(m, s)
+            print(min_sec_format, end='/r')
+            time.sleep(1)
+            num_of_secs -= 1
+          
+        self.finish_countdown=True
+    
     def leave(self,id):
-     controlDNodos[id]=False
-     ip_predecesor=self.get_predecesor(self.listaDNodos[id])
-     ip_sucesor=self.get_sucesor(self.listaDNodos[id])
-     self.actualizasucesor(ip_predecesor,ip_sucesor)
-     self.actualizapredecesor(ip_sucesor,ip_predecesor)
-     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        for nodo in self.listaDNodos:
-           if nodo!=self.listaDNodos[id]:
-             if controlDNodos[id]==True:             
-              try:
-               s.connect(nodo,8005)
-               s.send(b"LEAVE")
-               s.send(b"{}".__format__(str(id)))
-               s.close()
-              except:
-                print("Otro nodo salio del sistema ,se vera cuando lleguemos a el")
+        node_control[id]=False
+        ip_predecessor=self.get_predecessor(self.node_list[id])
+        ip_successor=self.get_successor(self.node_list[id])
+        self.update_successor(ip_predecessor,ip_successor)
+        self.update_predecessor(ip_successor,ip_predecessor)
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            for nodo in self.node_list:
+                if nodo!=self.node_list[id]:
+                    if node_control[id]==True:             
+                        try:
+                            s.connect(nodo,8005)
+                            s.send(b"LEAVE")
+                            s.send(b"{}".__format__(str(id)))
+                            s.close()
+                        except:
+                            print("Otro nodo salio del sistema ,se vera cuando lleguemos a el")
 
     def join(self,ip):
         soyNuevo=True
-        if not self.listaDNodos.count(ip)==1:   #Te estas reconectando           
-           controlDNodos[self.listaDNodos.index(ip)]=True
-           soyNuevo=False
-
+        if not self.node_list.count(ip)==1:   #Te estas reconectando           
+            node_control[self.node_list.index(ip)]=True
+            soyNuevo=False
         else:
-          controlDNodos.append(True)
-          self.listaDNodos.append(ip)
-        sucesor=self.get_sucesor(ip)
-        predecesor=self.get_predecesor(ip)
-        self.actualizasucesor(ip,sucesor)
-        self.actualizapredecesor(ip,predecesor)
-        self.actualizasucesor(predecesor,ip)
-        self.actualizapredecesor(sucesor,ip)
-        
-
+            node_control.append(True)
+            self.node_list.append(ip)
+        sucesor=self.get_successor(ip)
+        predecesor=self.get_predecessor(ip)
+        self.update_successor(ip,sucesor)
+        self.update_predecessor(ip,predecesor)
+        self.update_successor(predecesor,ip)
+        self.update_predecessor(sucesor,ip)
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-         for nodo in self.listaDNodos:            
-             if controlDNodos[self.listaDNodos.index(nodo)]:
-              try:
-               s.connect(nodo,8005)
-               s.send(b"JOIN")
-               send_list=json.dumps(controlDNodos)
-               s.send(b"{}".__format__(send_list.encode('utf-8')))
-               send_list=json.dumps(self.listaDNodos)
-               s.send(b"{}".__format__(send_list.encode('utf-8')))
-               if soyNuevo:
-                s.send(b"{}".__format__(str(self.listaDNodos.index(ip)).encode('utf-8')))
-               else:
-                s.send(b"")
-               if nodo==ip and not soyNuevo:
-                 s.send(b"Reconectando")
-               else:
-                 s.send(b"")
-               s.close()
-              except:
-                print("Otro nodo entro en el sistema ,se vera cuando lleguemos a el")
+            for nodo in self.node_list:            
+                if node_control[self.node_list.index(nodo)]:
+                    try:
+                        s.connect(nodo,8005)
+                        s.send(b"JOIN")
+                        send_list=json.dumps(node_control)
+                        s.send(b"{}".__format__(send_list.encode('utf-8')))
+                        send_list=json.dumps(self.node_list)
+                        s.send(b"{}".__format__(send_list.encode('utf-8')))
+                        if soyNuevo:
+                            s.send(b"{}".__format__(str(self.node_list.index(ip)).encode('utf-8')))
+                        else:
+                            s.send(b"")
+                        if nodo==ip and not soyNuevo:
+                            s.send(b"Reconectando")
+                        else:
+                            s.send(b"")
+                        s.close()
+                    except:
+                        print("Otro nodo entro en el sistema ,se vera cuando lleguemos a el")
       
-    def escucha(self):
-         servidor = socket.socket(
-               socket.AF_INET, socket.SOCK_STREAM)
+    def listen(self):
+          servidor = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
           
-         servidor.bind((self._ip,8005))
-         servidor.listen()
-         conn, addr = servidor.accept()
-         COMMAND=conn.recv(1024)
-         if COMMAND.decode('utf-8')=="actualiza predecesor":
-                  COMMAND=conn.recv(1024)
-                  self._predecesor=COMMAND.decode('utf-8')
-         elif COMMAND.decode('utf-8')=="actualiza sucesor":
-                  COMMAND=conn.recv(1024)
-                  self._sucesor=COMMAND.decode('utf-8')
-         elif COMMAND.decode('utf-8')=="LEAVE":
-                  COMMAND=conn.recv(1024)
-                  controlDNodos[int(COMMAND.decode('utf-8'))]=False
-         elif COMMAND.decode('utf-8')=="Dime si esta":
-                  COMMAND=conn.recv(1024).decode('utf-8')
-                  if self._archivos.count(COMMAND)==1:
-                     conn.send(b"Esta")
-                  else:
-                     archivo=self._archivosDelSistema[COMMAND][0] ##CargarArchivo
-                     with open(str(self.id)+archivo,'rb') as file:
-                       conn.sendfile(file)
-                     NodosEnLosQueEsta= json.dumps(self._archivosDelSistema[archivo]) ##Indexar en el hash del archivo
-                     conn.send(NodosEnLosQueEsta)
-                     
-                     
-         elif COMMAND.decode('utf-8')=="JOIN":
-                  COMMAND=conn.recv(1024)
-                  controlDNodos= json.loads(COMMAND.decode('utf-8'))
-                  COMMAND=conn.recv(1024)
-                  self.listaDNodos=json.loads(COMMAND.decode('utf-8'))
-                  COMMAND=conn.recv(1024)
-                  if COMMAND.decode('utf-8')!="":
-                    self._id=int(COMMAND.decode('utf-8'))
-                  self._ipLider=addr[0]
-                  COMMAND=conn.recv(1024)
-                  if COMMAND.decode('utf-8')=="Reconectando":
-                        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                         nuevosArchivos=[]
-                         for archivo in self._archivos:
-                          if len(self._archivosDelSistema[archivo])>1:
-                              s.connect(self._archivosDelSistema[archivo][2],8005)
+          servidor.bind((self.__ip,8005))
+          servidor.listen()
+          conn, addr = servidor.accept()
+          COMMAND=conn.recv(1024)
+          if COMMAND.decode('utf-8')=="actualiza predecesor":
+              COMMAND=conn.recv(1024)
+              self.__predecessor=COMMAND.decode('utf-8')
+          elif COMMAND.decode('utf-8')=="actualiza sucesor":
+              COMMAND=conn.recv(1024)
+              self.__successor=COMMAND.decode('utf-8')
+          elif COMMAND.decode('utf-8')=="LEAVE":
+              COMMAND=conn.recv(1024)
+              node_control[int(COMMAND.decode('utf-8'))]=False
+          elif COMMAND.decode('utf-8')=="Dime si esta":
+              COMMAND=conn.recv(1024).decode('utf-8')
+              if self.__files.count(COMMAND)==1:
+                  conn.send(b"Esta")
+              else:
+                  archivo=self.__files_system[COMMAND][0] ##CargarArchivo
+                  with open(str(self.id)+archivo,'rb') as file:
+                      conn.sendfile(file)
+                  NodosEnLosQueEsta= json.dumps(self.__files_system[archivo]) ##Indexar en el hash del archivo
+                  conn.send(NodosEnLosQueEsta)  
+          elif COMMAND.decode('utf-8')=="JOIN":
+              COMMAND=conn.recv(1024)
+              node_control= json.loads(COMMAND.decode('utf-8'))
+              COMMAND=conn.recv(1024)
+              self.node_list=json.loads(COMMAND.decode('utf-8'))
+              COMMAND=conn.recv(1024)
+              if COMMAND.decode('utf-8')!="":
+                  self.__id=int(COMMAND.decode('utf-8'))
+              self.__ip_boss=addr[0]
+              COMMAND=conn.recv(1024)
+              if COMMAND.decode('utf-8')=="Reconectando":
+                  with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                      nuevosArchivos=[]
+                      for archivo in self.__files:
+                          if len(self.__files_system[archivo])>1:
+                              s.connect(self.__files_system[archivo][2],8005)
                               s.send(b"Dime si esta")
                               s.send(archivo)
                               data=s.recv(1024).decode('utf-8')
@@ -642,101 +548,154 @@ class Node:
                                   archivo=s.recv(1024*5)
                                   hash=hashlib.sha256(archivo).hexdigest()
                                   with open(str(self.id)+","+hash, "wb") as file:
-                                     file.write(archivo)
+                                      file.write(archivo)
                                   nodosEnlosqueEsta=json.loads(s.recv(1024).decode('utf-8'))
                                   nuevosArchivos.append(data)
-                                  self._archivosDelSistema.setdefault(data,nodosEnlosqueEsta)
-
+                                  self.__files_system.setdefault(data,nodosEnlosqueEsta)
                               else:
-                                 nuevosArchivos.append(archivo)
+                                  nuevosArchivos.append(archivo)      
+                  self.__files=nuevosArchivos
+              else:
+                self.creaFingertable()           
+          elif COMMAND.decode('utf-8')=="UpdateFingertables":
+              for i in range(6):
+                  id=pow(2,i)+self.__id
+                  self.finger_table[id]=self.sucesor(id)
+          conn.close()
 
-                              
-                        self._archivos=nuevosArchivos
-                  else:
-                    self.creaFingertable()
-                             
-         elif COMMAND.decode('utf-8')=="UpdateFingertables":
-                  for i in range(6):
-                   id=pow(2,i)+self._id
-                   self.fingertable[id]=self.sucesor(id)
-         conn.close()
-
-    def sucesor(id,self):
+    def successor(self, id):
       pos=id+1
-      if pos>=len(self.listaDNodos):
-         pos=0
-      while controlDNodos[pos]!=True:
-        pos+=1
+      if pos>=len(self.node_list):
+          pos=0
+      while node_control[pos]!=True:
+          pos+=1
       return pos
+                  
+    def get_predecessor(self,ip):
+        pos=self.node_list.index(ip)
+        if pos==0:
+            pos==len(self.node_list)-1
+        else:
+            pos-=1
+        while not check_ping(self.node_list[pos]):
+            if pos==0:
+                pos==len(self.node_list)-1
+            else:
+                pos-=1
+        return self.node_list[pos]
 
-    def updatefingertables(self): #Luego poner el crear fingertables
-          
-          with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            for nodo in self.listaDNodos:
-              if controlDNodos[self.listaDNodos.index(nodo)]:
-                 s.connect(nodo,8005)
-                 s.send(b"UpdateFingertables")
-                 data=s.recv(1024)
-                 
-
-    def get_predecesor(self,ip):
-       pos=self.listaDNodos.index(ip)
-       if pos==0:
-         pos==len(self.listaDNodos)-1
-       else:
-         pos-=1
-       while not check_ping(self.listaDNodos[pos]):
-           if pos==0:
-             pos==len(self.listaDNodos)-1
-           else:
-             pos-=1
-       return self.listaDNodos[pos]
-
-    def actualizasucesor(ip,nuevo_sucesor):
-          with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            
+    def get_successor(self,ip):
+        pos=self.node_list.index(ip)
+        if pos==len(self.node_list)-1:
+            pos==0
+        else:
+            pos+=1
+        while not check_ping(self.node_list[pos]):
+            if pos==len(self.node_list)-1:
+                pos==0
+            else:
+                pos+=1
+        return self.node_list[pos]
+                    
+    def update_successor(ip,new_successor):
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.connect((ip, 8005))
             s.send(b"actualiza sucesor")
             
-            s.send(b'{}'.__format__(nuevo_sucesor.encode()))
+            s.send(b'{}'.__format__(new_successor.encode()))
             s.close()
-            
-    def actualizapredecesor(ip,nuevo_predecesor):
-          with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            
+             
+    def update_predecessor(ip,new_predecessor):
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.connect((ip, 8005))
             s.send(b"actualiza predecesor")
             
-            s.send(b'{}'.__format__(nuevo_predecesor.encode()))
-            s.close()
+            s.send(b'{}'.__format__(new_predecessor.encode()))
+            s.close() 
 
-    def get_sucesor(self,ip):
-       pos=self.listaDNodos.index(ip)
-       if pos==len(self.listaDNodos)-1:
-         pos==0
-       else:
-         pos+=1
-       while not check_ping(self.listaDNodos[pos]):
-           if pos==len(self.listaDNodos)-1:
-             pos==0
-           else:
-             pos+=1
-       return self.listaDNodos[pos]
-           
+    def stabilize(self):
+        ip=self.__ip
+        while ip[len(ip)-1]!='.':
+            ip=ip[0:len(ip)-1]
+        
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s: 
+            for i in range(2,255):
+                if self.__ip!= ip+str(i): 
+                    if self.node_list.count(ip+str(i))==1:
+                        try:
+                            s.connect((ip+str(i), 8003))
+                            s.send(b"Estas activo?")
+                            data=s.recv(1024)
+                            if data.decode('utf-8')=="Nodo Soy FTP":
+                                if not node_control[self.node_list.index(ip+str(i))]:
+                                    self.join(ip+str(i))
+                                else: 
+                                    continue
+                            else:
+                                self.leave(self.node_list.index(ip+str(i)))
+                            s.close()
+                        except:
+                            if node_control[self.node_list.index(ip)]:
+                                self.leave(self.node_list.index(ip+str(i)))                    
+                    elif check_ping(ip+str(i)):
+                        try :
+                            s.connect(ip+str(i),8003)
+                            s.send(b"Estas activo?")
+                            data=s.recv(1024)
+                            if data.decode('utf-8')=="Nodo Soy FTP":
+                                self.join(ip+str(i))
+                            s.close()
+                        except:
+                            s.close()
+                            continue
+                    s.close()
+
+    def update_nodes(self):
+        i=0
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s: 
+            for node in self.node_list:
+                if node_control[i]==True:
+                    s.connect(node,8008)
+                    s.send(b'Actualiza Archivos')
+                    send_list=json.dumps(self.__files_system.keys())
+                    s.send(b"{}".__format__(send_list.encode('utf-8')))
+                    send_list=json.dumps(self.__files_system.values())
+                    s.send(b"{}".__format__(send_list.encode('utf-8')))
+                    s.close()
+                i+=1
+
+    def run(self):  
+        while True:
+            if not self.stabilized_system:
+                if self.__ip_boss==self.__ip:
+                    while self.__ip_boss==self.__ip:
+                        self.stabilize()
+                        self.update_finger_tables()
+                        self.stabilized_system=True
+                elif self.__ip_boss==None:
+                    threading.Thread(target=self.recibiendoSenalDlider, args=()).start()
+                    temporizador=1
+                    while True:
+                        if self.leader_calls:
+                            break
+                        if temporizador==0:
+                            self.search_boss()
+                            break
+                        else: 
+                            time.sleep(1)
+                            temporizador-=1
+                elif not check_ping(self.__ip_boss):
+                    self.there_boss=False
+                    threading.Thread(target=self.esperaActualizacionDlider, args=()).start()
+                    threading.Thread(target=self.get_boss, args=()).start()
+                else:
+                    self.listen()
+            else:
+                self.processes_request()
+
 
 if __name__ == '__main__':
- nombre_equipo = socket.gethostname()
- direccionIP_equipo = socket.gethostbyname(nombre_equipo)
- nodo=Node(direccionIP_equipo)
- nodo.run()
-   
-  
-  
-
-
-
-
-
-
-
-
+    machine_name = socket.gethostname()
+    machine_ip = socket.gethostbyname(machine_name)
+    node=Node(machine_ip)
+    node.run()

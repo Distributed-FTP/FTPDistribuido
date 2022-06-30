@@ -6,9 +6,9 @@ import time
 import sys
 import tqdm
 from directory_manager import Directory_Manager
-from return_codes import Return_Codes
-from log import Log
-from help import Help_Commands
+from Accessories.return_codes import Return_Codes
+from Accessories.log import Log
+from Accessories.help import Help_Commands
 
 class ServerFTP(Thread):
     def __init__(self, connection, address, ip, port, log: Log, path, directory_manager: Directory_Manager):

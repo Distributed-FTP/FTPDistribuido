@@ -2,7 +2,7 @@ import os
 import socket, sys
 from directory_manager import Directory_Manager
 from ftp import ServerFTP
-from log import Log
+from Accessories.log import Log
 from threading import Thread
 
 IP = '0.0.0.0'
