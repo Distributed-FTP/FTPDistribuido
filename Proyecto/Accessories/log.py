@@ -3,8 +3,8 @@ import os
 from colorama import init, Fore, Style
 
 class Log():
-    def __init__(self):
-        self.path = os.getcwd() + "/register.log"
+    def __init__(self, path):
+        self.path = path + "/Reports/register.log"
     
     def LogMessageServer(self, data):
         print(Fore.BLUE + Style.BRIGHT + data + Style.RESET_ALL)
