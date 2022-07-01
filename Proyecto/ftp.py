@@ -224,9 +224,9 @@ class ServerFTP(Thread):
             users = str(users).replace("b'", '')
             users = str(users).replace("'", '')
             users = users.split("\\r\\n****\\r\\n")
-            print(users)
+            
             accepted = False
-            for i in range(1,len(users)-1,2):
+            for i in range(1,len(users)-1,3):
                 if str(users[i])==str(u):
                     self.__user = users[i]
                     self.__password = users[i+1]

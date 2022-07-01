@@ -34,7 +34,6 @@ def server_listener():
 if __name__ == "__main__":
     listener = Thread(target=server_listener)
     listener.start( )
-
     message = input().lower()
     if message == "q":
         listen_sock.close()
