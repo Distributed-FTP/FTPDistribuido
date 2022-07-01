@@ -711,13 +711,13 @@ class Node:
                  try: 
                    s.connect(nodo,8005)
                    s.close()
-                   if node_control[self.node_list.index(nodo)]==False:
+                   if not node_control[self.node_list.index(nodo)]:
                           self.join(nodo)
                           if self.NodosEncontrados.count(nodo)!=0:
                                   self.NodosEncontrados.remove(nodo)
 
                  except:
-                    if node_control[self.node_list.index(nodo)]==True:
+                    if node_control[self.node_list.index(nodo)]:
                         self.leave(self.node_list.index(nodo))
 
         for nodo in self.NodosEncontrados:
