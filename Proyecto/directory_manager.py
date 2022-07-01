@@ -1,4 +1,7 @@
 import os
+import socket
+
+import tqdm
 
 class Directory_Manager():
     def __init__(self, path: str):
@@ -6,6 +9,7 @@ class Directory_Manager():
         self.path_default = path
         self.route_path = path
         self.route_path_default = path
+        self.__buffer = 1024
     
     #Directories
     def create_directory(self, directory_name: str):
@@ -115,8 +119,8 @@ class Directory_Manager():
         self.route_path = directory_name.split(self.route_path_default)[1]
     
     
-    #Files
-    def upload_file(self, buffer: bytes, file_name: str, read_mode: str):
+    #Files   
+    def upload_file(self, file_name: str, read_mode: str, socket_client: socket.socket):
         file_name = file_name.replace("//", "/")
         file_name = self.route_path + file_name
         files = ""
@@ -131,16 +135,41 @@ class Directory_Manager():
         for i in range(len(file_list)):
             file = str(file_list[i]).replace("b'", '')
             file_list[i] = str(file).replace("'", '')
-        file_list.append("F~~" + file_name)
+        if not file_list.__contains__("F~~" + file_name):
+            file_list.append("F~~" + file_name)
         files = ""
         for i in range(len(file_list)):
             if file_list[i] != "":
                 files += file_list[i] + "\n"
         files.replace("//", "/")
         with open(self.path_default + file_name, read_mode) as f:
-            f.write(buffer)
+            while True:
+                bytes_recieved = socket_client.recv(self.__buffer)
+                f.write(bytes_recieved)
+                  
+                if bytes_recieved == b'':
+                    break 
+            
         with open(self.path, 'w') as f:
             f.write(files)
+    
+    def download_file(self, file_name: str, read_mode: str, socket_client: socket.socket, progress: tqdm):
+        file_name = file_name.replace("//", "/")
+        file_name = self.route_path + file_name
+        files = ""
+        with open(self.path, 'rb') as f:
+            while True:
+                bytes_read = f.read()
+                if bytes_read == b'':
+                    break
+                else:
+                    files += str(bytes_read)
+        file_list = files.split("\\n")
+        for i in range(len(file_list)):
+            file = str(file_list[i]).replace("b'", '')
+            file = str(file).replace("D~~", '')
+            file = str(file).replace("F~~", '')
+            file_list[i] = str(file).replace("'", '')         
     
     def delete_file(self, file_name: str):
         file_name = file_name.replace("//", "/")
@@ -163,7 +192,6 @@ class Directory_Manager():
         for i in range(len(file_list)):
             if file_list[i] != "":
                 files += file_list[i] + "\n"
-        print(file_name)
         os.remove(file_name)
         with open(self.path, 'w') as f:
             f.write(files)

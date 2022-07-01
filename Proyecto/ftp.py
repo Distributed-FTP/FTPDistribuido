@@ -490,14 +490,8 @@ class ServerFTP(Thread):
         self.__open_data_connection()
 
         readmode = 'w+b' if  self.type == 'I' else 'w'
-
         try:
-            while True:
-                bytes_recieved = self.data_connection.recv(self.__buffer)
-
-                self.directory_manager.upload_file(bytes_recieved, filename, readmode)  
-                
-                if not bytes_recieved: break         
+            self.directory_manager.upload_file(filename, readmode, self.data_connection) 
             
             self.__send_control(Return_Codes.Code_226().encode())
             self.log.LogOk(self.control_address[0], self.control_address[1], f"El usuario {self.__user} ha subido el archivo {filename}.")
@@ -531,14 +525,7 @@ class ServerFTP(Thread):
         readmode = 'w+b' if  self.type == 'I' else 'w'
 
         try:
-            with self.directory_manager.open_file(filename, readmode) as f:
-                
-                while True:
-                    bytes_recieved = self.data_connection.recv(self.__buffer)
-                    
-                    if not bytes_recieved: break
-
-                    f.write(bytes_recieved)
+            self.directory_manager.upload_file(filename, readmode, self.data_connection) 
             
             self.__send_control(Return_Codes.Code_226().encode())
             self.log.LogOk(self.control_address[0], self.control_address[1], f"El usuario {self.__user} ha subido el archivo {filename}.")
