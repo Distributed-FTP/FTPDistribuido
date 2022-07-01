@@ -172,12 +172,14 @@ class Node:
                 keys=self.finger_table.keys()
                 if keys.__contains__(id):
                     s.connect(self.node_list[self.finger_table[id]],8008)
-                    s.send(b"State")
+                    s.send(b"STAT")
+                    s.send(hash)
+                    s.send(id)
                     result=s.recv(1024).decode('utf-8')
-                    if result=="True":
-                        return True
+                    if result=="False":
+                        return False
                     else:
-                        return False                  
+                        return result                  
                 else:
                     id_nodes= self.finger_table.values()
                     pos=len(id_nodes)-1
@@ -190,7 +192,7 @@ class Node:
                             value=id_nodes[pos]
                           
                     s.connect(self.node_list[value],8008)
-                    s.send("1011: STATE")
+                    s.send("1011: STAT")
                     s.send("{}".format(id))
                     s.send("{}".format(hash))
                     return s.recv(1024).decode('utf-8')
@@ -380,7 +382,15 @@ class Node:
                 data=json.loads(data)
                 self.__files_system.setdefault(hash,data)
                 return True
-            elif data=="1011: State":
+            elif data=="STAT":
+                hash=conn.recv(1024).decode('utf-8')
+                id=conn.recv(1024).decode('utf-8')
+                if self.__files.count(hash):
+                     conn.send(os.stat('/store/'+id+","+hash))
+                else:
+                    conn.send(b"False")
+
+            elif data=="1011: STAT":
                 id=int(conn.recv(1024).decode('utf-8'))
                 hash=conn.recv(1024).decode('utf-8')
                 conn.send(str(self.find_file(hash,None,id,Search_Type.STATE)))
