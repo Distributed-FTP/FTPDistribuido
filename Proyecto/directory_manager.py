@@ -12,6 +12,7 @@ class Directory_Manager():
         self.__buffer = 1024
         self.__node = node_chord
     
+    
     #Directories
     def create_directory(self, directory_name: str):
         directory_name = directory_name.replace("//", "/")
@@ -232,7 +233,8 @@ class Directory_Manager():
         
     def get_file_size(self, file_name: str):
         return os.path.getsize(self.path_default + self.route_path + file_name)
-          
+     
+   
     #All
     def rename(self, name: str, new_name: str):
         name = name.replace(self.route_path_default, "")
@@ -257,12 +259,13 @@ class Directory_Manager():
                 files += file_list[i] + "\n"
         for i in range(len(file_list)):
             if file_list[i] == "F~~" + name:
-                self.__node.changeName_directory(self.route_path_default + name, self.route_path_default + new_name)
+                self.__node.change_name_file(self.route_path_default + name, self.route_path_default + new_name)
             elif file_list[i] == "D~~" + name + "/" or file_list[i] == "D~~" + name:
                 self.__node.changeName_directory(self.route_path_default + name, self.route_path_default + new_name)
         files = files.replace(name, new_name)
         with open(self.path, 'w') as f:
             f.write(files)
+       
         
     #Extra
     def basename(self, file_name: str):
