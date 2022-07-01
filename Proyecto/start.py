@@ -12,8 +12,8 @@ path = os.getcwd()
 
 def server_listener():
     global listen_sock
-    log = Log()
-    directory_manager = Directory_Manager()
+    log = Log(path)
+    directory_manager = Directory_Manager(path)
     log.LogClear()
     log.LogMessageServer(f'FTP Server - {IP}:{PORT} \n')
     listen_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)

@@ -1,6 +1,5 @@
 from random import Random
 import socket
-import os
 from threading import Thread
 import time
 import sys
@@ -32,9 +31,10 @@ class ServerFTP(Thread):
         self.stru = 'F'
         self.is_anonymous = False
         self.path = path + "/root/"
+        self.original_path = path + "/root/"
         
         self.__off = False
-        self.__path_db = path + "/database.db"
+        self.__path_db = path + "/Reports/database.db"
         self.__user = None
         self.__password = None
         
@@ -181,21 +181,21 @@ class ServerFTP(Thread):
         self.control_connection.close()
 
     def __has_access(self, file : str):
-        if not self.is_anonymous and file.find("anonymous") != 0:
+        if not self.is_anonymous and file.find("anonymous") == -1:
             return True
-        if self.is_anonymous and file.find("anonymous") != 0:
+        if self.is_anonymous and file.find("anonymous") != -1:
             return True
         return False
             
-    def __to_list_item(self,fn, path = "./root"):
-        st=os.stat(path + fn)
+    def __to_list_item(self,fname : str):
+        st=self.directory_manager.stat(fname)
         fullmode='rwxrwxrwx'
         mode=''
         for i in range(9):
             mode+=((st.st_mode>>(8-i))&1) and fullmode[i] or '-'
-        d=(os.path.isdir(path + fn)) and 'd' or '-'
+        d=(self.directory_manager.is_directory(fname)) and 'd' or '-'
         ftime=time.strftime(' %b %d %H:%M ', time.gmtime(st.st_mtime))
-        return d+mode+' 1 user group '+str(st.st_size)+ftime+os.path.basename(path + fn)+'\r\n'
+        return d+mode+' 1 user group '+str(st.st_size)+ftime+self.directory_manager.basename(fname)+'\r\n'
 
 
     '''
@@ -274,23 +274,23 @@ class ServerFTP(Thread):
             else:
                 pathname = self.path + pathname + "/"
             
-            if not os.path.isdir(pathname):
+            if not self.directory_manager.is_directory(pathname):
                 self.__send_control(Return_Codes.Code_550().encode())
                 self.log.LogError(self.control_address[0], self.control_address[1], f"La ruta {pathname} no existe.")
                 return
             
             if not self.is_anonymous and pathname.find("root") != -1:
-                os.chdir(pathname)
+                self.directory_manager.change_directory(pathname)
                 self.path = pathname
             elif self.is_anonymous and pathname.find("anonymous") != -1:
-                os.chdir(pathname)
+                self.directory_manager.change_directory(pathname)
                 self.path = pathname
             else:
                 self.__send_control(Return_Codes.Code_550().encode())
                 self.log.LogError(self.control_address[0], self.control_address[1], f"El usuario {self.__user} no tiene acceso a la ruta {pathname}.")
                 return
             
-            self.log.LogOk(self.control_address[0], self.control_address[1], f"El usuario {self.__user} accedio al directorio {os.getcwd()}.") 
+            self.log.LogOk(self.control_address[0], self.control_address[1], f"El usuario {self.__user} accedio al directorio {self.directory_manager.route_path}.") 
             self.__send_control(Return_Codes.Code_250().encode())
 
         # Caching the exception     
@@ -318,22 +318,22 @@ class ServerFTP(Thread):
             if p != '':
                 pathname = pathname + p + "/"   
         try: 
-            if not os.path.isdir(pathname):
+            if not self.directory_manager.is_directory(pathname):
                 self.__send_control(Return_Codes.Code_550().encode())
                 self.log.LogError(self.control_address[0], self.control_address[1], f"La ruta {pathname} no existe.")
                 return
             
             if not self.is_anonymous and pathname.find("root") != -1:
-                os.chdir(pathname + "/")
+                self.directory_manager.change_directory(pathname + "/")
                 self.path = pathname + "/"
             elif self.is_anonymous and pathname.find("anonymous") != -1:
-                os.chdir(pathname + "/")
+                self.directory_manager.change_directory(pathname + "/")
                 self.path = pathname + "/"
             else:
                 self.log.LogError(self.control_address[0], self.control_address[1], f"El usuario {self.__user} no tiene acceso al directorio {pathname}.")
                 self.__send_control(Return_Codes.Code_550().encode())
                 return
-            self.log.LogOk(self.control_address[0], self.control_address[1], f"El usuario {self.__user} entro al directorio {os.getcwd()}.")
+            self.log.LogOk(self.control_address[0], self.control_address[1], f"El usuario {self.__user} entro al directorio {self.directory_manager.route_path}.")
             self.__send_control(Return_Codes.Code_200().encode() )
 
         # Caching the exception     
@@ -353,7 +353,7 @@ class ServerFTP(Thread):
         self.type = 'A N'
         self.stru = 'F'
         self.is_anonymous = False
-        self.path = os.getcwd() + "/root/"
+        self.path = self.original_path
         self.__fd_rename = None
         
         try:
@@ -490,16 +490,8 @@ class ServerFTP(Thread):
         self.__open_data_connection()
 
         readmode = 'w+b' if  self.type == 'I' else 'w'
-
         try:
-            with self.directory_manager.open_file(filename, readmode) as f:
-                
-                while True:
-                    bytes_recieved = self.data_connection.recv(self.__buffer)
-                    
-                    if not bytes_recieved: break
-
-                    f.write(bytes_recieved)
+            self.directory_manager.upload_file(filename, readmode, self.data_connection) 
             
             self.__send_control(Return_Codes.Code_226().encode())
             self.log.LogOk(self.control_address[0], self.control_address[1], f"El usuario {self.__user} ha subido el archivo {filename}.")
@@ -533,14 +525,7 @@ class ServerFTP(Thread):
         readmode = 'w+b' if  self.type == 'I' else 'w'
 
         try:
-            with self.directory_manager.open_file(filename, readmode) as f:
-                
-                while True:
-                    bytes_recieved = self.data_connection.recv(self.__buffer)
-                    
-                    if not bytes_recieved: break
-
-                    f.write(bytes_recieved)
+            self.directory_manager.upload_file(filename, readmode, self.data_connection) 
             
             self.__send_control(Return_Codes.Code_226().encode())
             self.log.LogOk(self.control_address[0], self.control_address[1], f"El usuario {self.__user} ha subido el archivo {filename}.")
@@ -620,7 +605,7 @@ class ServerFTP(Thread):
         l = self.directory_manager.list_directory(path)
         for t in l:
             if self.__has_access(t):
-                k = self.__to_list_item(t, path)
+                k = self.__to_list_item(t)
                 self.__send_data(k.encode())
         self.__close_data_connection()
         self.__send_control(Return_Codes.Code_226().encode())
@@ -680,7 +665,7 @@ class ServerFTP(Thread):
                 pathname += str(names[i])
             else:
                 pathname += str(names[i]) + " "
-        if not os.path.isfile(pathname) and not os.path.isdir(pathname):
+        if not self.directory_manager.is_file(pathname) and not self.directory_manager.is_directory(pathname):
             self.__send_control(Return_Codes.Code_550().encode())
             self.log.LogError(self.control_address[0], self.control_address[1], f"La ruta {pathname} no existe.")
             return
