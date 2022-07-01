@@ -7,7 +7,6 @@ from posixpath import split
 from this import s
 import time
 from uuid import getnode
-import os
 import socket
 import json
 import threading
@@ -22,7 +21,7 @@ from Accessories.chord_communication_protocol import chord_protocol
 # si un nodo se desactivo o si un nodo se activo
 node_control=[]
 stabilized_system=True
-
+idNodoParaEnviarPeticion=0
 #esta variable es para saber el estado en que se encuentra chord , si buscando un elemento , si anadiendo un elemento o si esta reorganizando
 #los nodos
 chord_status=None
@@ -53,7 +52,8 @@ class Node:
         self.leader_calls=False
         self.stabilized_system=False
         self.finish_countdown=False
-        
+        self.NodosEncontrados=[]
+        self.NoSereLider=False
 
         #Todo Nodo debe saber si es el lider , en caso de que lo sea debe realizar acciones especificas
         # self.finger_table = {((self.__id+(i**2))%2**160) : self.__ip for i in range(160)} #!ID:IP
@@ -75,6 +75,7 @@ class Node:
                 if keys.__contains__(id):
                     s.connect(self.node_list[self.finger_table[id]],8008)
                     s.send(chord_protocol.get_file())
+                    s.send("{}".format(id))
                     s.send("{}".format(hash))
                     file=s.recv(1024*5)
                     s.close()
@@ -90,11 +91,11 @@ class Node:
                             pos-=1
                             value=id_nodes[pos]
                       
-                s.connect(self.node_list[value],8008)
-                s.send(chord_protocol.search_file())
-                s.send("{}".format(id))
-                s.send("{}".format(hash))
-                return s.recv(1024).decode('utf-8')
+                    s.connect(self.node_list[value],8008)
+                    s.send(chord_protocol.search_file())
+                    s.send("{}".format(id))
+                    s.send("{}".format(hash))
+                    return s.recv(1024).decode('utf-8')
         elif search_type == Search_Type.EDIT:
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s: 
                 keys=self.finger_table.keys()
@@ -131,7 +132,8 @@ class Node:
         hash_code = hash_code[1:len(hash_code)-1]
         
         if self.__files.count(hash_code)==1:
-            with open(hash_code, 'rb') as f:
+            
+            with open('/store/'+id+","+hash_code, 'rb') as f:
                 return f
         else:
             return self.find_file(hash_code, None, id, Search_Type.DOWNLOAD)
@@ -160,9 +162,11 @@ class Node:
                     count+=1
                     s.close()
                 try:
+                    id=self.node_list.index(ip)
                     s.connect(ip,8008)
                     s.send(chord_protocol.save_file())
                     s.sendfile(file)
+                    s.send(str(id))
                     data=s.recv(1024)
                     if not data.decode('utf-8') == chord_protocol.save_file():
                         return False
@@ -228,7 +232,8 @@ class Node:
             elif data=="1006: Save File":
                 file_text=conn.recv(1024*5).decode('utf-8')
                 hash=hashlib.sha256(file_text).hexdigest()
-                with open(hash, "wb") as file:
+                id=conn.recv(1024).decode('utf-8')
+                with open('/store/'+str(id)+","+hash, "wb") as file:
                     file.write(file_text)
                 self.__files.append(hash)
                 self.__files_system.setdefault(hash,[])
@@ -246,7 +251,7 @@ class Node:
                 file_text=conn.recv(1024*5).decode('utf-8')
                 os.remove(file_id)
                 hash_new_file=hashlib.sha256(file_text).hexdigest()
-                with open(str(self.id)+","+hash_new_file, "wb") as file:
+                with open('/store/'+str(id)+","+hash_new_file, "wb") as file:
                     file.write(file_text)
                 
                 ###Editar el archivo y donde quiera que este replicado 
@@ -261,16 +266,18 @@ class Node:
                             if node_control[self.node_list.index(replica)]==True:
                                 s.connect(replica,8008)
                                 s.send(chord_protocol.get_replica())
+                                s.send(id)
                                 s.send(hash)
                                 s.sendfile(file_text)
 
                 self.__files.append(hash)
                 self.__files_system[hash]=hash_new_file
             elif data=="1010: Get Replica":
+                id=conn.recv(1024).decode('utf-8') 
                 hash=conn.recv(1024).decode('utf-8')  
                 file_text=conn.recv(1024)
                 hash_new_file=hashlib.sha256(file_text).hexdigest()
-                with open(self.__id+","+hash_new_file, "wb") as file:
+                with open('/store/'+str(id)+","+hash_new_file, "wb") as file:
                     file.write(file_text)
                 self.__files_system[hash]=hash_new_file  
                 self.__files_system.setdefault(hash_new_file, self.__files_system[hash])   
@@ -284,12 +291,13 @@ class Node:
             elif data=="1002: Search for Edit File":
                   id=int(conn.recv(1024).decode('utf-8'))
                   hash=conn.recv(1024).decode('utf-8')
-                  archivo=conn.recv(1024).decode('utf-8')  ##Recibir el archivo de alguna forma
+                  archivo=conn.recv(1024).decode('utf-8')  ##Recibir el archivo 
                   self.find_file(hash,archivo,id,"Edicion")
                 ###Mandar el archivo  conn.sendfile
             elif data=="1000: Get File":
+                id=conn.recv(1024).decode('utf-8')
                 hash_code=conn.recv(1024).decode('utf-8')
-                with open(hash_code, 'rb') as f:
+                with open('/store/'+str(id)+","+hash_code, 'rb') as f:
                   conn.sendfile(f)
             elif data=="1005: Update Info":
                 hash=conn.recv(1024).decode('utf-8')
@@ -299,30 +307,45 @@ class Node:
                 return True
         conn.close()
 
+    def assign_requests(self):
+          if len(self.requests)>0:
+                 if node_control[idNodoParaEnviarPeticion]:
+                  with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                     s.connect(self.node_list[idNodoParaEnviarPeticion],8008)
+                     s.send(b"Recibe peticion")
+                     s.send(self.requests[0])
+                 if idNodoParaEnviarPeticion==len(self.node_list)-1:
+                      idNodoParaEnviarPeticion=0
+                 else:
+                    idNodoParaEnviarPeticion+=1
+
     def processes_request(self):
-      threading.Thread(target=self.countdown(), args=()).start()   #Este temporizador es para mirar estabilizar el sistema cada un tiempo determinado
+      threading.Thread(target=self.countdown(), args=(200)).start()   #Este temporizador es para estabilizar el sistema cada un tiempo determinado
       threading.Thread(target=self.get_requests_system(), args=()).start()
       
       while stabilized_system and not self.finish_countdown:
+          
           if self.__ip==self.__ip_boss:
-              while len(self.requests)>0:
-                  request=self.requests[0]
-                  if request=="subir":
-                      self.upload_file(request)
-                      self.update_nodes()
-                  if request=="descargar":
+              threading.Thread(target=self.get_requests(), args=()).start()
+              threading.Thread(target=self.assign_requests(), args=()).start()    
+              
+              #request=self.requests[0]
+              if request=="subir":
+                     self.upload_file(request)
+                     self.update_nodes()
+              if request=="descargar":
                       self.download_file(request)
-                  if request=="editar":
-                      self.edit_file(request,request)       
-
+              if request=="editar":
+                      self.edit_file(request,request)
+          
     def get_requests(self):
         server = socket.socket(
             socket.AF_INET, socket.SOCK_STREAM)
         server.bind((self.__ip,8007))
         server.listen()
         while True:
-            conn, addr = server.accept() # Establecemos la conexión con el cliente
-            data=conn.recv(1024)
+            conn, addr = server.accept() # Establecemos la conexión con el ftp para recibir las peticiones
+            data=conn.recv(1024)           ###Hay que ver como llegan las peticiones
             self.requests.append(data)
 
 
@@ -355,27 +378,66 @@ class Node:
             countpos+=1
     
     def search_boss(self):
-        #threading.Thread(target=self.conectaNodosIndep(), args=()).start()
-        
         ip=self.__ip
-        number=''
         while ip[len(ip)-1]!='.':
-            number=ip[len(ip)-1]+number
             ip=ip[0:len(ip)-1]
-        number=int(number)
-        pos=2
-        # while pos<=number:
-        #  if pos==number:
-        #        self.__ip_boss=self.__ip
-        #        self.id=0
-        #        self.node_list.append(self.__ip)
-        #        node_control.append(True)
-        #        self.__successor=self.__ip
-        #        self.__predecessor=self.__ip
-        #   if check_ping(ip+str(pos)):
-        #     break
-        # pos+=1   
-        self.__ip_boss=self.__ip
+        
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s: 
+            for i in range(2,10):
+                if self.NoSereLider==True:
+                    self.search_to_boss=False
+                    s.close()
+                    break
+                if self.__ip!= ip+str(i) and self.NodosEncontrados.count(ip+str(i))==0:  
+                  try:
+                    s.connect((ip+str(i), 8003))
+                    s.send(b"Code 399")
+                    data=s.recv(1024).decode('utf-8')
+                    if data=="Code #400#":
+                        self.leader_calls=True
+                        i=255
+                    elif data=="Nodo aislado":
+                         nodosEncontradosporEl=json.loads(s.recv(1024))
+                         set(self.NodosEncontrados.extend(nodosEncontradosporEl))
+                     
+
+
+
+                    s.close()
+                  except:
+                    continue
+            s.close()
+            self.search_to_boss=False
+
+                 #   if self.node_list.count(ip+str(i))==1:
+                  #      try:
+                  #          s.connect((ip+str(i), 8003))
+                  #          s.send(b"Estas activo?")
+                  #          data=s.recv(1024)
+                  #          if data.decode('utf-8')=="Nodo Soy FTP":
+                  #              if not node_control[self.node_list.index(ip+str(i))]:
+                  #                  self.join(ip+str(i))
+                  #              else: 
+                   #                 continue
+                   #         else:
+                   #             self.leave(self.node_list.index(ip+str(i)))
+                   #         s.close()
+                   #     except:
+                   #         if node_control[self.node_list.index(ip)]:
+                   #             self.leave(self.node_list.index(ip+str(i)))                    
+                   # elif check_ping(ip+str(i)):
+                   #     try :
+                   #         s.connect(ip+str(i),8003)
+                   #         s.send(b"Estas activo?")
+                   #         data=s.recv(1024)
+                   #         if data.decode('utf-8')=="Nodo Soy FTP":
+                   #             self.join(ip+str(i))
+                   #         s.close()
+                   #     except:
+                   #         s.close()
+                   #         continue
+                   # s.close()
+        
     
     def wait_update_boss(self):
         SERVER_PORT = 8002
@@ -397,21 +459,33 @@ class Node:
                     there_boss=True     
                 conn.close()     
     
-    def get_signal_boss(self):
+    def get_signal(self):
+             
         SERVER_PORT= 8003  
         self.server = socket.socket(
             socket.AF_INET, socket.SOCK_STREAM)
           
         self.server.bind((self.__ip,SERVER_PORT))
         self.server.listen()
-        conn, addr = self.server.accept() # Establecemos la conexión con el cliente
-        if conn:
-            data=conn.recv(1024)
-            if data.decode('utf-8')=="Estas activo?":
-                conn.send(b'Nodo Soy FTP')
-                self.leader_calls=True
-                self.__ip_boss=addr[0]
-                conn.close()
+        
+        while True:
+         conn, addr = self.server.accept() # Establecemos la conexión con el cliente
+         if conn:
+            data=conn.recv(1024).decode('utf-8')
+            if data=="Code #399#":
+                if self.__ip==self.__ip_boss:
+                    self.NodosEncontrados.append(addr[0])
+                    conn.send(b'Code #400#')
+                else:
+                    conn.send(b"Nodo aislado") 
+                    self.NodosEncontrados.append(self.__ip)
+                    conn.send(json.dumps(self.NodosEncontrados)) 
+                    self.NodosEncontrados=[]
+                    self.NoSereLider=True
+                    break
+            
+
+         conn.close()
     
     
     '''
@@ -516,11 +590,12 @@ class Node:
               node_control[int(COMMAND.decode('utf-8'))]=False
           elif COMMAND.decode('utf-8')=="Dime si esta":
               COMMAND=conn.recv(1024).decode('utf-8')
+              id=conn.recv(1024).decode('utf-8')
               if self.__files.count(COMMAND)==1:
                   conn.send(b"Esta")
               else:
                   archivo=self.__files_system[COMMAND][0] ##CargarArchivo
-                  with open(str(self.id)+archivo,'rb') as file:
+                  with open('/store/'+str(id)+","+archivo,'rb') as file:
                       conn.sendfile(file)
                   NodosEnLosQueEsta= json.dumps(self.__files_system[archivo]) ##Indexar en el hash del archivo
                   conn.send(NodosEnLosQueEsta)  
@@ -535,19 +610,33 @@ class Node:
               self.__ip_boss=addr[0]
               COMMAND=conn.recv(1024)
               if COMMAND.decode('utf-8')=="Reconectando":
+                  ids=[]
+                  for archivo in os.listdir(os.getcwd()+'/store'):    ##Aqui cargo los nodos 
+                     nombreDArchivo=archivo
+                     id=""
+                     while nombreDArchivo[0]!=",":
+                        id=nombreDArchivo[0]+id
+                        nombreDArchivo=nombreDArchivo[1:len(nombreDArchivo)]
+                     nombreDArchivo=nombreDArchivo[1:len(nombreDArchivo)]
+                     hash=nombreDArchivo
+                     self.__files.append(hash)
+                     ids.append(id)
+                  
                   with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                      nuevosArchivos=[]
+                      nuevosArchivos=[]  
                       for archivo in self.__files:
                           if len(self.__files_system[archivo])>1:
+                              
                               s.connect(self.__files_system[archivo][2],8005)
                               s.send(b"Dime si esta")
                               s.send(archivo)
+                              s.send(ids[self.__files.index[archivo]])
                               data=s.recv(1024).decode('utf-8')
                               if data!="Esta":
                                   os.remove(str(self.id)+","+archivo)
                                   archivo=s.recv(1024*5)
                                   hash=hashlib.sha256(archivo).hexdigest()
-                                  with open(str(self.id)+","+hash, "wb") as file:
+                                  with open('/store/'+str(ids[self.__files.index[archivo]])+","+hash,"wb") as file:
                                       file.write(archivo)
                                   nodosEnlosqueEsta=json.loads(s.recv(1024).decode('utf-8'))
                                   nuevosArchivos.append(data)
@@ -556,7 +645,7 @@ class Node:
                                   nuevosArchivos.append(archivo)      
                   self.__files=nuevosArchivos
               else:
-                self.creaFingertable()           
+                self.create_finger_table()           
           elif COMMAND.decode('utf-8')=="UpdateFingertables":
               for i in range(6):
                   id=pow(2,i)+self.__id
@@ -613,42 +702,66 @@ class Node:
             s.send(b'{}'.__format__(new_predecessor.encode()))
             s.close() 
 
-    def stabilize(self):
-        ip=self.__ip
-        while ip[len(ip)-1]!='.':
-            ip=ip[0:len(ip)-1]
+     
+
+    def stabilize(self):    
+      with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        for nodo in self.node_list:
+            if nodo != self.__ip:
+                 try: 
+                   s.connect(nodo,8005)
+                   s.close()
+                   if not node_control[self.node_list.index(nodo)]:
+                          self.join(nodo)
+                          if self.NodosEncontrados.count(nodo)!=0:
+                                  self.NodosEncontrados.remove(nodo)
+
+                 except:
+                    if node_control[self.node_list.index(nodo)]:
+                        self.leave(self.node_list.index(nodo))
+
+        for nodo in self.NodosEncontrados:
+            self.join(nodo)
         
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s: 
-            for i in range(2,255):
-                if self.__ip!= ip+str(i): 
-                    if self.node_list.count(ip+str(i))==1:
-                        try:
-                            s.connect((ip+str(i), 8003))
-                            s.send(b"Estas activo?")
-                            data=s.recv(1024)
-                            if data.decode('utf-8')=="Nodo Soy FTP":
-                                if not node_control[self.node_list.index(ip+str(i))]:
-                                    self.join(ip+str(i))
-                                else: 
-                                    continue
-                            else:
-                                self.leave(self.node_list.index(ip+str(i)))
-                            s.close()
-                        except:
-                            if node_control[self.node_list.index(ip)]:
-                                self.leave(self.node_list.index(ip+str(i)))                    
-                    elif check_ping(ip+str(i)):
-                        try :
-                            s.connect(ip+str(i),8003)
-                            s.send(b"Estas activo?")
-                            data=s.recv(1024)
-                            if data.decode('utf-8')=="Nodo Soy FTP":
-                                self.join(ip+str(i))
-                            s.close()
-                        except:
-                            s.close()
-                            continue
-                    s.close()
+        self.NodosEncontrados=[]
+
+               
+
+        #ip=self.__ip
+        #while ip[len(ip)-1]!='.':
+        #    ip=ip[0:len(ip)-1]
+        
+      #  with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s: 
+       #     for i in range(2,255):
+        #        if self.__ip!= ip+str(i): 
+        #            if self.node_list.count(ip+str(i))==1:
+        #                try:
+        #                    s.connect((ip+str(i), 8003))
+        #                    s.send(b"Estas activo?")
+        #                    data=s.recv(1024)
+        #                    if data.decode('utf-8')=="Nodo Soy FTP":
+        #                        if not node_control[self.node_list.index(ip+str(i))]:
+        #                            self.join(ip+str(i))
+        #                        else: 
+        #                            continue
+        #                    else:
+        #                        self.leave(self.node_list.index(ip+str(i)))
+        #                    s.close()
+        #                except:
+        #                    if node_control[self.node_list.index(ip)]:
+        #                        self.leave(self.node_list.index(ip+str(i)))                    
+        #            elif check_ping(ip+str(i)):
+        #                try :
+        #                    s.connect(ip+str(i),8003)
+         #                   s.send(b"Estas activo?")
+         #                   data=s.recv(1024)
+         #                   if data.decode('utf-8')=="Nodo Soy FTP":
+         #                       self.join(ip+str(i))
+         #                   s.close()
+         #               except:
+         #                   s.close()
+         #                   continue
+         #           s.close()
 
     def update_nodes(self):
         i=0
@@ -668,25 +781,35 @@ class Node:
         while True:
             if not self.stabilized_system:
                 if self.__ip_boss==self.__ip:
-                    while self.__ip_boss==self.__ip:
+                    while self.__ip_boss==self.__ip:                        
                         self.stabilize()
                         self.update_finger_tables()
                         self.stabilized_system=True
                 elif self.__ip_boss==None:
-                    threading.Thread(target=self.recibiendoSenalDlider, args=()).start()
-                    temporizador=1
+                    self.search_to_boss=True
+                    threading.Thread(target=self.get_signal, args=()).start()
+                    threading.Thread(target=self.search_boss, args=()).start()
+                    
                     while True:
-                        if self.leader_calls:
-                            break
-                        if temporizador==0:
-                            self.search_boss()
-                            break
-                        else: 
-                            time.sleep(1)
-                            temporizador-=1
+                        if self.search_to_boss==False:
+                            if self.leader_calls:
+                                   break
+                            else:
+                                self.__ip_boss=self.__ip
+                                self.__id=0
+                                self.node_list.append(self.__ip)
+                                node_control.append(True)
+                                self.__successor=self.__ip
+                                self.__predecessor=self.__ip
+                        elif self.NoSereLider==True:
+                                 self.__ip_boss=="temporal"
+                                 self.NoSereLider=False
+                                 break
+                                
+                            
                 elif not check_ping(self.__ip_boss):
                     self.there_boss=False
-                    threading.Thread(target=self.esperaActualizacionDlider, args=()).start()
+                    threading.Thread(target=self.wait_update_boss, args=()).start()
                     threading.Thread(target=self.get_boss, args=()).start()
                 else:
                     self.listen()
