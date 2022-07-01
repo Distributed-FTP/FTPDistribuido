@@ -248,7 +248,6 @@ class Directory_Manager():
                 else:
                     files += str(bytes_read)
                     
-        files = files.replace(name, new_name)
         file_list = files.split("\\n") 
         files = ""
         for i in range(len(file_list)):
@@ -256,9 +255,14 @@ class Directory_Manager():
             file_list[i] = str(file).replace("'", '')
             if file_list[i] != "":
                 files += file_list[i] + "\n"
+        for i in range(len(file_list)):
+            if file_list[i] == "F~~" + name:
+                print("Es Archivo")
+            elif file_list[i] == "D~~" + name + "/" or file_list[i] == "D~~" + name:
+                self.__node.changeName_directory(self.route_path_default + name, self.route_path_default + new_name)
+        files = files.replace(name, new_name)
         with open(self.path, 'w') as f:
             f.write(files)
-        os.rename(self.route_path_default + name, self.route_path_default + new_name)
         
     #Extra
     def basename(self, file_name: str):
@@ -286,10 +290,9 @@ class Directory_Manager():
         for i in range(len(file_list)):
             file = str(file_list[i]).replace("b'", '')
             file_list[i] = str(file).replace("'", '')
-        print(file_name)
         for i in range(len(file_list)):
             if file_list[i] == "F~~" + file_name:
                 print("Es Archivo")
-            elif file_list[i] == "D~~" + file_name:
+            elif file_list[i] == "D~~" + file_name + "/" or file_list[i] == "D~~" + file_name:
                 return self.__node.state_directory(self.route_path_default + file_name)
-        return os.stat(self.route_path_default + file_name)
+        return None
