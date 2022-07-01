@@ -203,7 +203,7 @@ class Directory_Manager():
         for i in range(len(file_list)):
             if file_list[i] != "":
                 files += file_list[i] + "\n"
-        os.remove(file_name)
+        self.__node.delete_directory(file_name)
         with open(self.path, 'w') as f:
             f.write(files)
     
@@ -257,7 +257,7 @@ class Directory_Manager():
                 files += file_list[i] + "\n"
         for i in range(len(file_list)):
             if file_list[i] == "F~~" + name:
-                print("Es Archivo")
+                self.__node.changeName_directory(self.route_path_default + name, self.route_path_default + new_name)
             elif file_list[i] == "D~~" + name + "/" or file_list[i] == "D~~" + name:
                 self.__node.changeName_directory(self.route_path_default + name, self.route_path_default + new_name)
         files = files.replace(name, new_name)
@@ -292,7 +292,7 @@ class Directory_Manager():
             file_list[i] = str(file).replace("'", '')
         for i in range(len(file_list)):
             if file_list[i] == "F~~" + file_name:
-                print("Es Archivo")
+                return self.__node.state_file(self.route_path_default + file_name)
             elif file_list[i] == "D~~" + file_name + "/" or file_list[i] == "D~~" + file_name:
                 return self.__node.state_directory(self.route_path_default + file_name)
         return None

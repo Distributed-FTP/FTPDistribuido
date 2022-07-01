@@ -223,7 +223,8 @@ class ServerFTP(Thread):
                         users+=str(bytes_read)
             users = str(users).replace("b'", '')
             users = str(users).replace("'", '')
-            users = users.split("\\n****\\n")
+            users = users.split("\\r\\n****\\r\\n")
+            print(users)
             accepted = False
             for i in range(1,len(users)-1,2):
                 if str(users[i])==str(u):
