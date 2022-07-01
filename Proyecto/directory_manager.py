@@ -1,7 +1,7 @@
 import os
 import socket
-
 import tqdm
+from chord import Node
 
 class Directory_Manager():
     def __init__(self, path: str):
@@ -169,7 +169,17 @@ class Directory_Manager():
             file = str(file_list[i]).replace("b'", '')
             file = str(file).replace("D~~", '')
             file = str(file).replace("F~~", '')
-            file_list[i] = str(file).replace("'", '')         
+            file_list[i] = str(file).replace("'", '')   
+        
+        with open(self.path_default + file_name, read_mode) as f:
+            for _ in progress:
+                progress.update(len(bytes_read)) 
+                bytes_read = f.read(self.__buffer)
+
+                if bytes_read == b'':
+                    break 
+                socket_client.send(bytes_read)
+            progress.close()
     
     def delete_file(self, file_name: str):
         file_name = file_name.replace("//", "/")
@@ -220,7 +230,7 @@ class Directory_Manager():
         return False
         
     def get_file_size(self, file_name: str):
-        return os.path.getsize(file_name)
+        return os.path.getsize(self.path_default + self.route_path + file_name)
           
     #All
     def rename(self, name: str, new_name: str):
@@ -261,4 +271,23 @@ class Directory_Manager():
             return names[len(names)-2]
     
     def stat(self, file_name: str):
-        return os.stat(file_name)
+        file_name = file_name.replace("//", "/")
+        file_name = file_name.replace(self.route_path_default, "")
+        files = ""
+        with open(self.path, 'rb') as f:
+            while True:
+                bytes_read = f.read()
+                if bytes_read == b'':
+                    break
+                else:
+                    files += str(bytes_read)
+        file_list = files.split("\\n")
+        for i in range(len(file_list)):
+            file = str(file_list[i]).replace("b'", '')
+            file_list[i] = str(file).replace("'", '')
+        for i in range(len(file_list)):
+            if file_list[i].__contains__(file_name) and file_list[i].__contains__("F~~"):
+                print("Es Archivo")
+            elif file_list[i].__contains__(file_name) and file_list[i].__contains__("D~~"):
+                print("Es Directorio")
+        return os.stat(self.route_path_default + file_name)
