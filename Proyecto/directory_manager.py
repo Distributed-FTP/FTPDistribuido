@@ -4,12 +4,13 @@ import tqdm
 from chord import Node
 
 class Directory_Manager():
-    def __init__(self, path: str):
+    def __init__(self, path: str, node_chord: Node):
         self.path = path + "/Reports/files.fl"
         self.path_default = path
         self.route_path = path
         self.route_path_default = path
         self.__buffer = 1024
+        self.__node = node_chord
     
     #Directories
     def create_directory(self, directory_name: str):
@@ -33,9 +34,9 @@ class Directory_Manager():
             if file_list[i] != "":
                 files += file_list[i] + "\n"
         files.replace("//", "/")
+        self.__node.create_directory(directory_name)
         with open(self.path, 'w') as f:
             f.write(files)
-        os.mkdir(directory_name)
     
     def delete_directory(self, directory_name: str):
         directory_name = directory_name.replace("//", "/")
@@ -61,9 +62,9 @@ class Directory_Manager():
             if file_list[i] != "":
                 files += file_list[i] + "\n" 
         files.replace("//", "/")
+        self.__node.delete_directory(directory_name)
         with open(self.path, 'w') as f:
             f.write(files)
-        os.rmdir(directory_name)
     
     def is_directory(self, directory_name: str):
         directory_name = directory_name.replace("//", "/")
@@ -285,9 +286,10 @@ class Directory_Manager():
         for i in range(len(file_list)):
             file = str(file_list[i]).replace("b'", '')
             file_list[i] = str(file).replace("'", '')
+        print(file_name)
         for i in range(len(file_list)):
-            if file_list[i].__contains__(file_name) and file_list[i].__contains__("F~~"):
+            if file_list[i] == "F~~" + file_name:
                 print("Es Archivo")
-            elif file_list[i].__contains__(file_name) and file_list[i].__contains__("D~~"):
-                print("Es Directorio")
+            elif file_list[i] == "D~~" + file_name:
+                return self.__node.state_directory(self.route_path_default + file_name)
         return os.stat(self.route_path_default + file_name)

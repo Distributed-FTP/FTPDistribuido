@@ -1,9 +1,7 @@
 from base64 import decode
 from errno import ELIBBAD
-from fcntl import F_ADD_SEALS
 import hashlib
 from itertools import count
-from msilib.schema import Error
 from multiprocessing.sharedctypes import Value
 import os
 from posixpath import split
@@ -73,12 +71,10 @@ class Node:
         Actions
     '''
     def create_directory(self,name:str):
-         listDir=os.listdir('/root')
-         if listDir.count(name)==0:
-            os.mkdir('/root/'+name)
-            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s: 
-             for nodo in self.node_list:
-                 if nodo!=self.__ip:
+        os.mkdir(name)
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s: 
+            for nodo in self.node_list:
+                if nodo!=self.__ip:
                     if node_control[self.node_list.index(nodo)]==True:
                         try:
                             s.connect(nodo,8008)
@@ -86,11 +82,9 @@ class Node:
                             s.send(name)   
                         except:
                             stabilized_system=False
-         else:
-            return  EOFError("Existe un Directorio con este nombre")
 
     def changeName_directory(self,name,new_name):
-        os.rename('/root/'+name,new_name)
+        os.rename(name,new_name)
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s: 
              for nodo in self.node_list:
                  if nodo!=self.__ip:
@@ -104,7 +98,7 @@ class Node:
                             stabilized_system=False
          
     def delete_directory(self,name):
-        os.remove('/root/'+name)
+        os.rmdir(name)
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s: 
              for nodo in self.node_list:
                  if nodo!=self.__ip:
@@ -117,7 +111,7 @@ class Node:
                             stabilized_system=False
 
     def state_directory(self,name):
-        os.stat('/root/'+name)
+        return os.stat(name)
 
     def find_file(self,hash,file,id,search_type: Search_Type):
         if search_type == Search_Type.DOWNLOAD:  

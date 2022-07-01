@@ -1,5 +1,6 @@
 import os
 import socket, sys
+from chord import Node
 from directory_manager import Directory_Manager
 from ftp import ServerFTP
 from Accessories.log import Log
@@ -13,7 +14,6 @@ path = os.getcwd()
 def server_listener():
     global listen_sock
     log = Log(path)
-    directory_manager = Directory_Manager(path)
     log.LogClear()
     log.LogMessageServer(f'FTP Server - {IP}:{PORT} \n')
     listen_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -23,6 +23,8 @@ def server_listener():
     listen_sock.listen(5)
     log.LogMessageServer(f'Servidor iniciado en {listen_sock.getsockname( )}\n')
     while True:
+        node = Node(IP)
+        directory_manager = Directory_Manager(path, node)
         connection, address = listen_sock.accept()
         connection.settimeout(5)
         log.LogWarning(f'Conexion aceptada en {address}')
