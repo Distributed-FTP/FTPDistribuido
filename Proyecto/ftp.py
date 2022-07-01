@@ -556,25 +556,15 @@ class ServerFTP(Thread):
             self.__send_control(Return_Codes.Code_550().encode())
             return
 
-        progress = tqdm.tqdm(range(
-            filesize), "Sending {filename}", unit="B", unit_scale=True, unit_divisor=1024)
-
         self.__send_control(Return_Codes.Code_150().encode())
-        self.data_connection.connect(self.data_address)
+        self.__open_data_connection()
 
-        readmode = 'rb' if  self.mode == 'I' else 'r'
+        readmode = 'rb' if  self.type == 'I' else 'r'
 
-        try: 
-            with self.directory_manager.open_file(filename, readmode) as f:
-
-                for _ in progress:
-
-                    bytes_read = f.read(self.__buffer)
-
-                    if not bytes_read:
-                        break
-                    self.data_connection.send(bytes_read)
-                    progress.update(len(bytes_read))
+        try:
+            progress = tqdm.tqdm(range(filesize), unit="B", unit_scale=True, unit_divisor=1024)
+            self.directory_manager.download_file(filename, readmode, self.data_connection, progress)
+            
             self.__send_control(Return_Codes.Code_226().encode())
             self.log.LogOk(self.control_address[0], self.control_address[1], f"El usuario {self.__user} ha descargado el archivo {filename}.")
                 
