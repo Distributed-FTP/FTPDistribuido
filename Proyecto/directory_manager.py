@@ -151,7 +151,9 @@ class Directory_Manager():
                   
                 if bytes_recieved == b'':
                     break 
-            
+        
+        self.__node.upload_file(self.path_default + file_name)
+        
         with open(self.path, 'w') as f:
             f.write(files)
     
