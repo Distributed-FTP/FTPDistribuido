@@ -281,7 +281,7 @@ class Node:
                     return data         
 
     def get_size_file(self,root):
-        file_id=self.files_hash[root]
+        file_id=self.files_hash.get(root)
         
         hash_code = file_id
         id=""
@@ -424,7 +424,7 @@ class Node:
     
     def edit_file(self,root, new_file):
         
-        file_id=self.files_hash[root]
+        file_id=self.files_hash.get(root)
         
         hash_code = file_id
         id=""
@@ -449,7 +449,7 @@ class Node:
 
     def delete_file(self,root):
        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        file_id=self.files_hash[root]
+        file_id=self.files_hash.get(root)
         for nodo in self.node_list: 
             if nodo!=self.__ip:
                 if node_control[self.node_list.index(nodo)]==True:
@@ -522,7 +522,7 @@ class Node:
                 self.__files_system.setdefault(hash_new_file,self.__files_system[hash])    #anadir el nuevo hash junto a la lista de ips donde esta el archivo
                 self.__files.remove(hash)
                 self.__files.append(hash_new_file) ##Anadir el nuevo hash
-                self.files_hash[root]=id+","+hash_new_file
+                self.files_hash.setdefault(root,id+","+hash_new_file)
 
                 for nodo in self.node_list:
                     if nodo!=self.__ip:
@@ -663,7 +663,7 @@ class Node:
             elif data=="UPDATE FILE EDITION":
                 root=conn.recv(1024).decode('utf-8')
                 new_hash=conn.recv(1024).decode('utf-8')
-                self.files_hash[root]=new_hash
+                self.files_hash.setdefault(root,new_hash)
                 conn.close()
             elif data=="SIZE":
                 id=conn.recv(1024).decode('utf-8')
@@ -867,7 +867,7 @@ class Node:
         except:
             None
         
-        file_id=self.files_hash[root]
+        file_id=self.files_hash.get(root)
         
         hash_code = file_id
         id=""
