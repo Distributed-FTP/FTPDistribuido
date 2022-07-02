@@ -349,12 +349,8 @@ class Node:
             id+=hash_code[0]
             hash_code=hash_code[1:len(hash_code)-1]
         hash_code=hash_code[1:len(hash_code)-1]
-        
-        cut_root=root
-        while cut_root[len(cut_root)-1]!="/":
-               cut_root=cut_root[0:len(cut_root)-1]
 
-        self.find_file(hash_code, new_file, id, Search_Type.EDIT,cut_root)
+        self.find_file(hash_code, new_file, id, Search_Type.EDIT,root)
     
     def change_name_file(self,root,rootNew):
          with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -427,10 +423,13 @@ class Node:
                 root=conn.recv(1024).decode('utf-8')
                 file_id=id+","+hash
                 file_text=conn.recv(1024*5).decode('utf-8')
-                os.remove(root+file_id)
+                cut_root=root
+                while cut_root[len(cut_root)-1]!="/":
+                 cut_root=cut_root[0:len(cut_root)-1]
+                os.remove(cut_root+file_id)
 
                 hash_new_file=hashlib.sha256(file_text).hexdigest()
-                with open(root+str(id)+","+hash_new_file, "wb") as file:
+                with open(cut_root+str(id)+","+hash_new_file, "wb") as file:
                     file.write(file_text)
                 
                 ###Editar el archivo y donde quiera que este replicado 
@@ -438,7 +437,18 @@ class Node:
                 self.__files_system.setdefault(hash_new_file,self.__files_system[hash])    #anadir el nuevo hash junto a la lista de ips donde esta el archivo
                 self.__files.remove(hash)
                 self.__files.append(hash_new_file) ##Anadir el nuevo hash
-                
+                self.files_hash[root]=id+","+hash_new_file
+
+                for nodo in self.node_list:
+                    if nodo!=self.__ip:
+                        if node_control[self.node_list.index(nodo)]:
+                         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:                         
+                            s.connect(nodo,8008)
+                            s.send(b"UPDATE FILE EDITION")
+                            s.send(root)
+                            s.send(hash_new_file)
+                            s.close()
+                 
                 with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s: 
                     for replica in self.__files_system[hash]:
                         if replica!=self.__ip:
@@ -447,16 +457,19 @@ class Node:
                                 s.send(chord_protocol.get_replica())
                                 s.send(id)
                                 s.send(hash)
+                                s.send(cut_root)
                                 s.sendfile(file_text)
 
                 self.__files.append(hash)
                 self.__files_system[hash]=hash_new_file
             elif data=="1010: Get Replica":
                 id=conn.recv(1024).decode('utf-8') 
-                hash=conn.recv(1024).decode('utf-8')  
+                hash=conn.recv(1024).decode('utf-8')
+                root=conn.recv(1024).decode('utf-8')    
                 file_text=conn.recv(1024)
                 hash_new_file=hashlib.sha256(file_text).hexdigest()
-                with open('/store/'+str(id)+","+hash_new_file, "wb") as file:
+                os.remove(root+id+","+hash)
+                with open(root+id+","+hash_new_file, "wb") as file:
                     file.write(file_text)
                 self.__files_system[hash]=hash_new_file  
                 self.__files_system.setdefault(hash_new_file, self.__files_system[hash])   
@@ -550,6 +563,13 @@ class Node:
                 id=conn.recv(1024).decode('utf-8')
                 self.files_hash.setdefault(root,id)
                 conn.close()
+            elif data=="UPDATE FILE EDITION":
+                root=conn.recv(1024).decode('utf-8')
+                new_hash=conn.recv(1024).decode('utf-8')
+                self.files_hash[root]=new_hash
+                conn.close()
+                
+                    
 
         conn.close()
 
