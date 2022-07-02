@@ -1,4 +1,5 @@
 from asyncore import file_dispatcher
+from audioop import add
 from base64 import decode
 from errno import ELIBBAD
 import hashlib
@@ -661,13 +662,11 @@ class Node:
                     data=s.recv(1024).decode('utf-8')
                     if data=="Code #400#":
                         self.leader_calls=True
+                        s.send(json.dumps(self.NodosEncontrados))
                         i=255
                     elif data=="Nodo aislado":
                          nodosEncontradosporEl=json.loads(s.recv(1024))
                          set(self.NodosEncontrados.extend(nodosEncontradosporEl))
-                     
-
-
 
                     s.close()
                   except:
@@ -712,13 +711,29 @@ class Node:
                 if self.__ip==self.__ip_boss:
                     self.NodosEncontrados.append(addr[0])
                     conn.send(b'Code #400#')
-                else:
+                    listaDOtrosNodosSueltos=conn.recv(1024)
+                    self.NodosEncontrados.extend(json.loads(listaDOtrosNodosSueltos))
+
+                elif self.__ip_boss==None:
                     conn.send(b"Nodo aislado") 
                     self.NodosEncontrados.append(self.__ip)
                     conn.send(json.dumps(self.NodosEncontrados)) 
                     self.NodosEncontrados=[]
                     self.NoSereLider=True
                     break
+                else:
+                    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                        s.connect(self.__ip_boss,8003)
+                        s.send(b"Code #398#")
+            elif data=="Code #398#":
+                    if self.__ip==self.__ip_boss:
+                        if self.node_list.count(addr[0])==1 and node_control[self.node_list.index(addr[0])]:
+                               set(self.NodosEncontrados.extend(json.loads(s.recv(1024))))
+                    else:
+                        conn.send("")
+            
+            else:
+                conn.send("")
             
 
          conn.close()
