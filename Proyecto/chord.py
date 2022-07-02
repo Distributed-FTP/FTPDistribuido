@@ -570,6 +570,7 @@ class Node:
                 else:
                     with open(root+id+","+hash, 'rb') as f: 
                      conn.sendfile(f)
+                     conn.send("")
                      f.close()
                     os.remove(root+id+","+hash)
 
@@ -587,6 +588,7 @@ class Node:
                 try: 
                   with open(root+str(id)+","+hash_code, 'rb') as f:
                    conn.sendfile(f)
+                   conn.send("")
                    f.close()
                   os.remove(root+str(id)+","+hash_code)
                 except:
@@ -882,6 +884,8 @@ class Node:
 
         return self.find_file(hash_code,None, id, Search_Type.STATE,cut_root)
 
+    def remove_file(self,root):
+        os.remove(root)
 
     '''
         Additional Actions
