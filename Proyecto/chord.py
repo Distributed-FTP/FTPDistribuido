@@ -199,7 +199,7 @@ class Node:
                             value=id_nodes[pos]
                           
                     s.connect(self.node_list[value],8008)
-                    s.send("1011: STAT")
+                    s.send(b"1011: STAT")
                     s.send("{}".format(id))
                     s.send("{}".format(hash))
                     return s.recv(1024).decode('utf-8')
@@ -225,11 +225,58 @@ class Node:
                             value=id_nodes[pos]
                           
                     s.connect(self.node_list[value],8008)
-                    s.send("SEARCH FOR DELETE")
+                    s.send(b"SEARCH FOR DELETE")
                     s.send("{}".format(id))
                     s.send("{}".format(hash))
                     s.send("{}".format(root))
-         
+        elif search_type == Search_Type.FILE_SIZE:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s: 
+                keys=self.finger_table.keys()
+                if keys.__contains__(id):
+                    s.connect(self.node_list[self.finger_table[id]],8008)
+                    s.send(b"SIZE")
+                    s.send("{}".format(str(id)))
+                    s.send("{}".format(hash))
+                    s.send("{}".format(root))          
+                    data=s.recv(1024) 
+                    s.close()
+                    return data
+                else:
+                    id_nodes= self.finger_table.values()
+                    pos=len(id_nodes)-1
+                    value=id_nodes[pos]
+                    while True:
+                        if value<id:
+                            break
+                        else:
+                            pos-=1
+                            value=id_nodes[pos]
+                          
+                    s.connect(self.node_list[value],8008)
+                    s.send(b"SEARCH FILE_SIZE")
+                    s.send("{}".format(id))
+                    s.send("{}".format(hash))
+                    s.send("{}".format(root))
+                    data=s.recv(1024)
+                    return data
+                    
+
+    def get_size_file(self,root):
+        file_id=self.files_hash[root]
+        
+        hash_code = file_id
+        id=""
+        while hash_code[0]!=",":
+            id+=hash_code[0]
+            hash_code=hash_code[1:len(hash_code)-1]
+        hash_code=hash_code[1:len(hash_code)-1]
+        
+        cut_root=root
+        while cut_root[len(cut_root)-1]!="/":
+               cut_root=cut_root[0:len(cut_root)-1]
+
+        return self.find_file(hash_code, None, id, Search_Type.FILE_SIZE,cut_root)
+
     def download_file(root,self):
         
         file_id=self.files_hash[root]
@@ -569,8 +616,16 @@ class Node:
                 new_hash=conn.recv(1024).decode('utf-8')
                 self.files_hash[root]=new_hash
                 conn.close()
-                
-                    
+            elif data=="SIZE":
+                id=conn.recv(1024).decode('utf-8')
+                hash=conn.recv(1024).decode('utf-8')
+                root=conn.recv(1024).decode('utf-8')
+                conn.send(os.path.getsize(os.getcwd()+root+id+","+hash))
+            elif data=="SEARCH FILE_SIZE":
+                id=conn.recv(1024).decode('utf-8')
+                hash=conn.recv(1024).decode('utf-8')
+                root=conn.recv(1024).decode('utf-8')
+                conn.send(self.find_file(hash,None,id,Search_Type.FILE_SIZE,root))
 
         conn.close()
 

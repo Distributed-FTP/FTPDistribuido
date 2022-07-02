@@ -6,3 +6,4 @@ class Search_Type(Enum):
     EDIT = 2
     STATE=3
     DELETE=4
+    FILE_SIZE=5
