@@ -41,7 +41,7 @@ def check_ping(host_name):
 #Recordar pasar la requests a los demas nodos por si el lider se cae
 
 class Node:
-    def __init__(self,ip):
+    def __init__(self, ip, path):
         self.__id=None
         self.__ip=ip
         self.__files=list()  #se guardaran los archivos que esten almacenados en este nodo , mas alla que sea una replica . 
@@ -59,6 +59,8 @@ class Node:
         self.NodosEncontrados=[]
         self.NoSereLider=False
         self.files_hash=dict()
+        
+        self.get_files(path + "/Reports/files.fl")
 
         #Todo Nodo debe saber si es el lider , en caso de que lo sea debe realizar acciones especificas
         # self.finger_table = {((self.__id+(i**2))%2**160) : self.__ip for i in range(160)} #!ID:IP
@@ -321,7 +323,6 @@ class Node:
                  return EOFError("El Archivo no esta disponible")
              else:
                return True
-    
     
     def upload_file(self,root):  #Este metodo escoge el nodo que lo almacenara y le envia un mensaje para que lo guarde
       
@@ -719,7 +720,29 @@ class Node:
             data=conn.recv(1024)           ###Hay que ver como llegan las peticiones
             self.requests.append(data)
 
-
+    def get_files(self, path):
+        files = ""
+        with open(path, 'rb') as f:
+            while True:
+                bytes_read = f.read()
+                if bytes_read == b'':
+                    break
+                else:
+                    files += str(bytes_read)
+        file_list = files.split("\\n")
+        for i in range(len(file_list)):
+            file = str(file_list[i]).replace("b'", '')
+            file_list[i] = str(file).replace("'", '')
+        for i in range(len(file_list)):
+            if file_list[i].__contains__("F~~"):
+                file_list[i] = file_list[i].replace("F~~", '')
+                try:
+                    os.stat(file_list[i])
+                    #Aquí lo agregas al diccionario
+                except:
+                    None
+        
+        
     '''
         Boss Operations
     '''

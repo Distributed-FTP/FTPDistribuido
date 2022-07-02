@@ -184,7 +184,8 @@ class Directory_Manager():
                     break 
                 socket_client.send(bytes_read)
             progress.close()
-    
+        #self.__node.download_file(self.path_default + file_name)
+        
     def delete_file(self, file_name: str):
         file_name = file_name.replace("//", "/")
         files = ""

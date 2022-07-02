@@ -23,7 +23,7 @@ def server_listener():
     listen_sock.listen(5)
     log.LogMessageServer(f'Servidor iniciado en {listen_sock.getsockname( )}\n')
     while True:
-        node = Node(IP)
+        node = Node(IP, path)
         directory_manager = Directory_Manager(path, node)
         connection, address = listen_sock.accept()
         connection.settimeout(5)
