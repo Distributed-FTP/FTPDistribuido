@@ -343,9 +343,10 @@ class Node:
                      id_file_return=int(s.recv(1024).decode('utf-8'))
                      self.files_hash.setdefault(root,id_file_return)
                     else:
+                     hash=hashlib.sha256(file).hexdigest()
                      self.__files.append(hash)
                      self.__files_system.setdefault(hash,[])
-                     self.files_hash.setdefault(root,cut_root+self.__id+","+hashlib.sha256(file).hexdigest())
+                     self.files_hash.setdefault(root,cut_root+self.__id+","+hash)
                     
                     for nodo in self.node_list:
                         if nodo!=self.__ip:
