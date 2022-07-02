@@ -60,7 +60,7 @@ class Node:
         self.NoSereLider=False
         self.files_hash=dict()
         
-        self.get_files(path + "/Reports/files.fl")
+        self.get_files(path)
 
         #Todo Nodo debe saber si es el lider , en caso de que lo sea debe realizar acciones especificas
         # self.finger_table = {((self.__id+(i**2))%2**160) : self.__ip for i in range(160)} #!ID:IP
@@ -722,7 +722,7 @@ class Node:
 
     def get_files(self, path):
         files = ""
-        with open(path, 'rb') as f:
+        with open(path + "/Reports/files.fl", 'rb') as f:
             while True:
                 bytes_read = f.read()
                 if bytes_read == b'':
@@ -737,8 +737,8 @@ class Node:
             if file_list[i].__contains__("F~~"):
                 file_list[i] = file_list[i].replace("F~~", '')
                 try:
-                    os.stat(file_list[i])
-                    #Aquí lo agregas al diccionario
+                    os.stat(path + file_list[i])
+                    #Agregar al diccionario
                 except:
                     None
         
