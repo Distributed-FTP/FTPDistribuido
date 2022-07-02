@@ -182,7 +182,6 @@ class Directory_Manager():
                 break 
         progress.close()
             
-    
     def delete_file(self, file_name: str):
         file_name = file_name.replace("//", "/")
         files = ""

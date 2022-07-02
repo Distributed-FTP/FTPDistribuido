@@ -563,7 +563,7 @@ class ServerFTP(Thread):
         readmode = 'rb' if  self.type == 'I' else 'r'
 
         try:
-            progress = tqdm.tqdm(range(filesize), unit="B", unit_scale=True, unit_divisor=1024)
+            progress = tqdm.tqdm(range(filesize), desc="Descargando...", unit="B", unit_scale=True, unit_divisor=self.__buffer)
             self.directory_manager.download_file(filename, readmode, self.data_connection, progress)
             
             self.__send_control(Return_Codes.Code_226().encode())
