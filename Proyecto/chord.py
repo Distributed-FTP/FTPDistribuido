@@ -1,3 +1,4 @@
+from asyncore import file_dispatcher
 from base64 import decode
 from errno import ELIBBAD
 import hashlib
@@ -113,7 +114,7 @@ class Node:
     def state_directory(self,name):
         return os.stat(name)
 
-    def find_file(self,hash,file,id,search_type: Search_Type,root=None):
+    def find_file(self,hash,file,id,search_type: Search_Type,root):
         if search_type == Search_Type.DOWNLOAD:  
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s: 
                 keys=self.finger_table.keys()
@@ -122,6 +123,7 @@ class Node:
                     s.send(chord_protocol.get_file())
                     s.send("{}".format(id))
                     s.send("{}".format(hash))
+                    s.send("{}".format(root))
                     file=s.recv(1024*5)
                     s.close()
                     return file
@@ -140,6 +142,7 @@ class Node:
                     s.send(chord_protocol.search_file())
                     s.send("{}".format(id))
                     s.send("{}".format(hash))
+                    s.send("{}".format(root))
                     return s.recv(1024).decode('utf-8')
         elif search_type == Search_Type.EDIT:
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s: 
@@ -149,6 +152,7 @@ class Node:
                     s.send(chord_protocol.edit_file())
                     s.send("{}".format(str(id)))
                     s.send("{}".format(hash))
+                    s.send("{}".format(root))
                     s.sendfile(file)           
                     s.close()
                 else:
@@ -166,6 +170,7 @@ class Node:
                     s.send(chord_protocol.search_for_edit_file())
                     s.send("{}".format(id))
                     s.send("{}".format(hash))
+                    s.send("{}".format(root))
                     s.sendfile(file)
         elif search_type== Search_Type.STATE:
                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s: 
@@ -175,6 +180,7 @@ class Node:
                     s.send(b"STAT")
                     s.send(hash)
                     s.send(id)
+                    s.send(root)
                     result=s.recv(1024).decode('utf-8')
                     if result=="False":
                         return False
@@ -203,7 +209,8 @@ class Node:
                     s.connect(self.node_list[self.finger_table[id]],8008)
                     s.send(b"DELETE FILE")
                     s.send("{}".format(str(id)))
-                    s.send("{}".format(hash))           
+                    s.send("{}".format(hash))
+                    s.send("{}".format(root))           
                     s.close()
                 else:
                     id_nodes= self.finger_table.values()
@@ -217,13 +224,15 @@ class Node:
                             value=id_nodes[pos]
                           
                     s.connect(self.node_list[value],8008)
-                    s.send(chord_protocol.search_for_edit_file())
+                    s.send("SEARCH FOR DELETE")
                     s.send("{}".format(id))
                     s.send("{}".format(hash))
-                    s.sendfile(file)
+                    s.send("{}".format(root))
          
-              
-    def download_file(file_id,self):
+    def download_file(root,self):
+        
+        file_id=self.files_hash[root]
+        
         hash_code = file_id
         id = ""
         while hash_code[0]!=",":
@@ -231,16 +240,24 @@ class Node:
             hash_code = hash_code[1:len(hash_code)-1]
         hash_code = hash_code[1:len(hash_code)-1]
         
+        cut_root=root
+        while cut_root[len(cut_root)-1]!="/":
+               cut_root=cut_root[0:len(cut_root)-1]
+
         if self.__files.count(hash_code)==1:
             
-            with open('/store/'+id+","+hash_code, 'rb') as f:
-                
+            with open(cut_root+id+","+hash_code, 'rb') as f: 
                 return f
         else:
-            return self.find_file(hash_code, None, id, Search_Type.DOWNLOAD)
+            return self.find_file(hash_code, None, id, Search_Type.DOWNLOAD,cut_root)
     
-    def upload_file(self, file):  #Este metodo escoge el nodo que lo almacenara y le envia un mensaje para que lo guarde
-        if self.__files.count(hashlib.sha256(file).hexdigest())==0:
+    def upload_file(self,file,root):  #Este metodo escoge el nodo que lo almacenara y le envia un mensaje para que lo guarde
+        
+        cut_root=root
+        while cut_root[len(cut_root)-1]!="/":
+               cut_root=cut_root[0:len(cut_root)-1]
+    
+        if self.files_hash.count(root)==0:
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s: 
                 ip=None
                 count_files=0
@@ -268,10 +285,22 @@ class Node:
                     s.send(chord_protocol.save_file())
                     s.sendfile(file)
                     s.send(str(id))
+                    s.send(cut_root)
                     data=s.recv(1024)
                     if not data.decode('utf-8') == chord_protocol.save_file():
                         return False
-                    id_node_return=int(s.recv(1024).decode('utf-8'))
+                    id_file_return=int(s.recv(1024).decode('utf-8'))
+                    self.files_hash.setdefault(root,id_file_return)
+                    for nodo in self.node_list:
+                        if nodo!=self.__ip:
+                            if node_control[self.node_list.index(nodo)]==True:
+                                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s: 
+                                    s.connect(nodo,8008)
+                                    s.send("UPLOAD")
+                                    s.send(root)
+                                    s.send(id_file_return)
+                                    s.close()
+
                     s.close()
                     nodes_where_the_file_is=[]
                     file_hash= hashlib.sha256(file).hexdigest()
@@ -288,9 +317,12 @@ class Node:
                         s.connect(ip,8008)
                         s.send(chord_protocol.save_file())          #Hacer que los nodos confirmen cuando hayan realizado el almacenamiento
                         s.sendfile(file)
+                        s.send(str(id))
+                        s.send(cut_root)
                         data=s.recv(1024)
                         if not data.decode('utf-8')==chord_protocol.save_file():
                             return False
+                        data=s.recv(1024)
                         nodes_where_the_file_is.append(ip)
                         s.close()
                         count_replicas-=1
@@ -303,11 +335,14 @@ class Node:
                 except:
                     stabilized_system=False
                     return False
-                return id_node_return
+                return id_file_return
         else:
             return False
     
-    def edit_file(self, file_id, new_file):
+    def edit_file(self,root, new_file):
+        
+        file_id=self.files_hash[root]
+        
         hash_code = file_id
         id=""
         while hash_code[0]!=",":
@@ -315,7 +350,11 @@ class Node:
             hash_code=hash_code[1:len(hash_code)-1]
         hash_code=hash_code[1:len(hash_code)-1]
         
-        self.find_file(hash_code, new_file, id, Search_Type.EDIT)
+        cut_root=root
+        while cut_root[len(cut_root)-1]!="/":
+               cut_root=cut_root[0:len(cut_root)-1]
+
+        self.find_file(hash_code, new_file, id, Search_Type.EDIT,cut_root)
     
     def change_name_file(self,root,rootNew):
          with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -346,10 +385,12 @@ class Node:
             id+=hash_code[0]
             hash_code=hash_code[1:len(hash_code)-1]
        hash_code=hash_code[1:len(hash_code)-1]
-         
-       self.find_file(hash_code, None, id, Search_Type.DELETE)
 
-         
+       cut_root=root
+       while cut_root[len(cut_root)-1]!="/":
+               cut_root=cut_root[0:len(cut_root)-1]
+
+       self.find_file(hash_code, None, id, Search_Type.DELETE,cut_root)
 
     def get_requests_system(self):
         server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -368,7 +409,8 @@ class Node:
                 file_text=conn.recv(1024*5).decode('utf-8')
                 hash=hashlib.sha256(file_text).hexdigest()
                 id=conn.recv(1024).decode('utf-8')
-                with open('/store/'+str(id)+","+hash, "wb") as file:
+                root=conn.recv(1024).decode('utf-8')
+                with open(root+str(id)+","+hash, "wb") as file:
                     file.write(file_text)
                 self.__files.append(hash)
                 self.__files_system.setdefault(hash,[])
@@ -382,11 +424,13 @@ class Node:
             elif data=="1004: Edit File":
                 id=conn.recv(1024).decode('utf-8')
                 hash=conn.recv(1024).decode('utf-8')
+                root=conn.recv(1024).decode('utf-8')
                 file_id=id+","+hash
                 file_text=conn.recv(1024*5).decode('utf-8')
-                os.remove(file_id)
+                os.remove(root+file_id)
+
                 hash_new_file=hashlib.sha256(file_text).hexdigest()
-                with open('/store/'+str(id)+","+hash_new_file, "wb") as file:
+                with open(root+str(id)+","+hash_new_file, "wb") as file:
                     file.write(file_text)
                 
                 ###Editar el archivo y donde quiera que este replicado 
@@ -421,18 +465,21 @@ class Node:
             elif data=="1001: Search File":
                 id=int(conn.recv(1024).decode('utf-8'))
                 hash=conn.recv(1024).decode('utf-8')
-                archivo=self.find_file(hash,None,id,"Descarga")
+                root=conn.recv(1024).decode('utf-8')
+                archivo=self.find_file(hash,None,id,Search_Type.DOWNLOAD,root)
                 conn.sendfile(archivo)
             elif data=="1002: Search for Edit File":
                   id=int(conn.recv(1024).decode('utf-8'))
                   hash=conn.recv(1024).decode('utf-8')
+                  root=conn.recv(1024).decode('utf-8')
                   archivo=conn.recv(1024).decode('utf-8')  ##Recibir el archivo 
-                  self.find_file(hash,archivo,id,"Edicion")
+                  self.find_file(hash,archivo,id,Search_Type.EDIT,root)
                 ###Mandar el archivo  conn.sendfile
             elif data=="1000: Get File":
                 id=conn.recv(1024).decode('utf-8')
                 hash_code=conn.recv(1024).decode('utf-8')
-                with open('/store/'+str(id)+","+hash_code, 'rb') as f:
+                root=conn.recv(1024).decode('utf-8')
+                with open(root+str(id)+","+hash_code, 'rb') as f:
                   conn.sendfile(f)
             elif data=="1005: Update Info":
                 hash=conn.recv(1024).decode('utf-8')
@@ -443,15 +490,17 @@ class Node:
             elif data=="STAT":
                 hash=conn.recv(1024).decode('utf-8')
                 id=conn.recv(1024).decode('utf-8')
-                if self.__files.count(hash):
-                     conn.send(os.stat('/store/'+id+","+hash))
+                root=conn.recv(1024).decode('utf-8')
+                if self.__files.count(hash)==1:
+                     conn.send(os.stat(root+id+","+hash))
                 else:
                     conn.send(b"False")
 
             elif data=="1011: STAT":
                 id=int(conn.recv(1024).decode('utf-8'))
                 hash=conn.recv(1024).decode('utf-8')
-                conn.send(str(self.find_file(hash,None,id,Search_Type.STATE)))
+                root=conn.recv(1024).decode('utf-8')
+                conn.send(str(self.find_file(hash,None,id,Search_Type.STATE,root)))
             elif data=="Create Directory":
                 name=conn.recv(1024).decode('utf-8')
                 os.mkdir('/root'+name)
@@ -467,12 +516,40 @@ class Node:
                 rootNew=conn.recv(1024).decode('utf-8')
                 file_id=self.files_hash.pop(root)
                 self.files_hash.setdefault(rootNew,file_id)
+            elif data=="DELETE REPLICA":
+                id=conn.recv(1024).decode('utf-8')
+                hash=conn.recv(1024).decode('utf-8')
+                root=conn.recv(1024).decode('utf-8')
+                os.remove(root+id+","+hash)
+            elif data=="SEARCH FOR DELETE":
+                id=conn.recv(1024).decode('utf-8')
+                hash=conn.recv(1024).decode('utf-8')
+                root=conn.recv(1024).decode('utf-8')
+                self.find_file(hash,None,id,Search_Type.DELETE,root)
+            elif data=="DELETE FILE":
+                id=conn.recv(1024).decode('utf-8')
+                hash=conn.recv(1024).decode('utf-8')
+                root=conn.recv(1024).decode('utf-8')
+                os.remove(root+id+","+hash)
+                for nodo in self.__files_system[hash]:
+                   if nodo!=self.__ip:
+                      conn.close()
+                      with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s: 
+                          s.connect(nodo,8008)
+                          s.send(b"DELETE REPLICA")
+                          s.send("{}".format(str(id)))
+                          s.send("{}".format(hash))
+                          s.send("{}".format(root))
+                          s.close() 
             elif data=="DELETE":
                 root=conn.recv(1024).decode('utf-8')
                 self.files_hash.pop(root)
-            elif data=="DELETE FILE":
+                conn.close()
+            elif data=="UPLOAD":
                 root=conn.recv(1024).decode('utf-8')
-                self.files_hash.pop(root)
+                id=conn.recv(1024).decode('utf-8')
+                self.files_hash.setdefault(root,id)
+                conn.close()
 
         conn.close()
 
@@ -577,37 +654,7 @@ class Node:
                     continue
             s.close()
             self.search_to_boss=False
-
-                 #   if self.node_list.count(ip+str(i))==1:
-                  #      try:
-                  #          s.connect((ip+str(i), 8003))
-                  #          s.send(b"Estas activo?")
-                  #          data=s.recv(1024)
-                  #          if data.decode('utf-8')=="Nodo Soy FTP":
-                  #              if not node_control[self.node_list.index(ip+str(i))]:
-                  #                  self.join(ip+str(i))
-                  #              else: 
-                   #                 continue
-                   #         else:
-                   #             self.leave(self.node_list.index(ip+str(i)))
-                   #         s.close()
-                   #     except:
-                   #         if node_control[self.node_list.index(ip)]:
-                   #             self.leave(self.node_list.index(ip+str(i)))                    
-                   # elif check_ping(ip+str(i)):
-                   #     try :
-                   #         s.connect(ip+str(i),8003)
-                   #         s.send(b"Estas activo?")
-                   #         data=s.recv(1024)
-                   #         if data.decode('utf-8')=="Nodo Soy FTP":
-                   #             self.join(ip+str(i))
-                   #         s.close()
-                   #     except:
-                   #         s.close()
-                   #         continue
-                   # s.close()
         
-    
     def wait_update_boss(self):
         SERVER_PORT = 8002
 
@@ -673,7 +720,10 @@ class Node:
                     s.send(b"UpdateFingertables")
                     data=s.recv(1024)
     
-    def state_file(self,file_id):
+    def state_file(self,root):
+        
+        file_id=self.files_hash[root]
+        
         hash_code = file_id
         id=""
         while hash_code[0]!=",":
@@ -681,7 +731,11 @@ class Node:
             hash_code=hash_code[1:len(hash_code)-1]
         hash_code=hash_code[1:len(hash_code)-1]
         
-        return self.find_file(hash_code,None, id, Search_Type.STATE)
+        cut_root=root
+        while cut_root[len(cut_root)-1]!="/":
+               cut_root=cut_root[0:len(cut_root)-1]
+
+        return self.find_file(hash_code,None, id, Search_Type.STATE,cut_root)
 
 
     '''
@@ -904,43 +958,6 @@ class Node:
         
         self.NodosEncontrados=[]
 
-               
-
-        #ip=self.__ip
-        #while ip[len(ip)-1]!='.':
-        #    ip=ip[0:len(ip)-1]
-        
-      #  with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s: 
-       #     for i in range(2,255):
-        #        if self.__ip!= ip+str(i): 
-        #            if self.node_list.count(ip+str(i))==1:
-        #                try:
-        #                    s.connect((ip+str(i), 8003))
-        #                    s.send(b"Estas activo?")
-        #                    data=s.recv(1024)
-        #                    if data.decode('utf-8')=="Nodo Soy FTP":
-        #                        if not node_control[self.node_list.index(ip+str(i))]:
-        #                            self.join(ip+str(i))
-        #                        else: 
-        #                            continue
-        #                    else:
-        #                        self.leave(self.node_list.index(ip+str(i)))
-        #                    s.close()
-        #                except:
-        #                    if node_control[self.node_list.index(ip)]:
-        #                        self.leave(self.node_list.index(ip+str(i)))                    
-        #            elif check_ping(ip+str(i)):
-        #                try :
-        #                    s.connect(ip+str(i),8003)
-         #                   s.send(b"Estas activo?")
-         #                   data=s.recv(1024)
-         #                   if data.decode('utf-8')=="Nodo Soy FTP":
-         #                       self.join(ip+str(i))
-         #                   s.close()
-         #               except:
-         #                   s.close()
-         #                   continue
-         #           s.close()
 
     def update_nodes(self):
         i=0
