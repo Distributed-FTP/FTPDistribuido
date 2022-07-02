@@ -1,6 +1,7 @@
 from asyncore import file_dispatcher
 from audioop import add
 from base64 import decode
+from dataclasses import field
 from errno import ELIBBAD
 import hashlib
 from itertools import count
@@ -124,10 +125,20 @@ class Node:
                     s.send(chord_protocol.get_file())
                     s.send("{}".format(id))
                     s.send("{}".format(hash))
-                    s.send("{}".format(root))
-                    file=s.recv(1024*5)
-                    s.close()
-                    return file
+                    s.send("{}".format(root))  
+                    file=s.recv(1024)
+                    if file=="Retorna":
+                        s.close()
+                        return file
+                    else:
+                     while file!="":
+                      with open(root+str(id)+","+hash, "wb") as f:
+                        f.write(file)
+                        file=s.recv(1024)
+                     s.close()
+                     
+                     return "File Download"
+                     
                 else:
                     id_nodes= self.finger_table.values()
                     pos=len(id_nodes)-1
@@ -144,7 +155,16 @@ class Node:
                     s.send("{}".format(id))
                     s.send("{}".format(hash))
                     s.send("{}".format(root))
-                    return s.recv(1024).decode('utf-8')
+                    data=s.recv(1024).decode('utf-8')
+                    if data=="Retorna":
+                        return data
+                    else:
+                      while data!="":
+                       with open(root+str(id)+","+hash, "wb") as f:
+                         f.write(data)
+                         data=s.recv(1024)
+                      s.close()
+
         elif search_type == Search_Type.EDIT:
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s: 
                 keys=self.finger_table.keys()
@@ -292,11 +312,16 @@ class Node:
                cut_root=cut_root[0:len(cut_root)-1]
 
         if self.__files.count(hash_code)==1:
-            
             with open(cut_root+id+","+hash_code, 'rb') as f: 
-                return f
+                return True
         else:
-            return self.find_file(hash_code, None, id, Search_Type.DOWNLOAD,cut_root)
+             result=self.find_file(hash_code, None, id, Search_Type.DOWNLOAD,cut_root)
+
+             if result=="Retorna":
+                 return EOFError("El Archivo no esta disponible")
+             else:
+               return True
+    
     
     def upload_file(self,root):  #Este metodo escoge el nodo que lo almacenara y le envia un mensaje para que lo guarde
       
@@ -540,7 +565,14 @@ class Node:
                 hash=conn.recv(1024).decode('utf-8')
                 root=conn.recv(1024).decode('utf-8')
                 archivo=self.find_file(hash,None,id,Search_Type.DOWNLOAD,root)
-                conn.sendfile(archivo)
+                if archivo=="Retorna":
+                    conn.send(archivo)
+                else:
+                    with open(root+id+","+hash, 'rb') as f: 
+                     conn.sendfile(f)
+                     f.close()
+                    os.remove(root+id+","+hash)
+
             elif data=="1002: Search for Edit File":
                   id=int(conn.recv(1024).decode('utf-8'))
                   hash=conn.recv(1024).decode('utf-8')
@@ -552,8 +584,13 @@ class Node:
                 id=conn.recv(1024).decode('utf-8')
                 hash_code=conn.recv(1024).decode('utf-8')
                 root=conn.recv(1024).decode('utf-8')
-                with open(root+str(id)+","+hash_code, 'rb') as f:
-                  conn.sendfile(f)
+                try: 
+                  with open(root+str(id)+","+hash_code, 'rb') as f:
+                   conn.sendfile(f)
+                   f.close()
+                  os.remove(root+str(id)+","+hash_code)
+                except:
+                    conn.send("Retorna")
             elif data=="1005: Update Info":
                 hash=conn.recv(1024).decode('utf-8')
                 data=conn.recv(1024).decode('utf-8')
