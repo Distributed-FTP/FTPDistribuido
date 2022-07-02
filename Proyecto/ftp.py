@@ -3,7 +3,7 @@ import socket
 from threading import Thread
 import time
 import sys
-import tqdm
+from tqdm import tqdm
 from directory_manager import Directory_Manager
 from Accessories.return_codes import Return_Codes
 from Accessories.log import Log
@@ -563,7 +563,7 @@ class ServerFTP(Thread):
         readmode = 'rb' if  self.type == 'I' else 'r'
 
         try:
-            progress = tqdm.tqdm(range(filesize), desc="Descargando...", unit="B", unit_scale=True, unit_divisor=self.__buffer)
+            progress = tqdm(range(filesize), desc="Descargando...", unit="B", unit_scale=True, unit_divisor=self.__buffer)
             self.directory_manager.download_file(filename, readmode, self.data_connection, progress)
             
             self.__send_control(Return_Codes.Code_226().encode())
