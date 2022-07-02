@@ -258,8 +258,7 @@ class Node:
                     s.send("{}".format(hash))
                     s.send("{}".format(root))
                     data=s.recv(1024)
-                    return data
-                    
+                    return data         
 
     def get_size_file(self,root):
         file_id=self.files_hash[root]
@@ -305,7 +304,7 @@ class Node:
         while cut_root[len(cut_root)-1]!="/":
                cut_root=cut_root[0:len(cut_root)-1]
     
-        if self.files_hash.count(root)==0:
+        if self.files_hash.keys().count(root)==0:
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s: 
                 ip=None
                 count_files=0
