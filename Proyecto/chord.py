@@ -298,8 +298,10 @@ class Node:
         else:
             return self.find_file(hash_code, None, id, Search_Type.DOWNLOAD,cut_root)
     
-    def upload_file(self,file,root):  #Este metodo escoge el nodo que lo almacenara y le envia un mensaje para que lo guarde
-        
+    def upload_file(self,root):  #Este metodo escoge el nodo que lo almacenara y le envia un mensaje para que lo guarde
+      
+     with open(root, 'rb') as file: 
+                
         cut_root=root
         while cut_root[len(cut_root)-1]!="/":
                cut_root=cut_root[0:len(cut_root)-1]
@@ -327,17 +329,24 @@ class Node:
                     count+=1
                     s.close()
                 try:
-                    id=self.node_list.index(ip)
-                    s.connect(ip,8008)
-                    s.send(chord_protocol.save_file())
-                    s.sendfile(file)
-                    s.send(str(id))
-                    s.send(cut_root)
-                    data=s.recv(1024)
-                    if not data.decode('utf-8') == chord_protocol.save_file():
+                    if ip!=self.__ip:
+                     id=self.node_list.index(ip)
+                     s.connect(ip,8008)
+                     s.send(chord_protocol.save_file())
+                     s.send(str(id))
+                     s.send(cut_root)
+                     s.sendfile(file)
+                     s.send("")
+                     data=s.recv(1024)
+                     if not data.decode('utf-8') == chord_protocol.save_file():
                         return False
-                    id_file_return=int(s.recv(1024).decode('utf-8'))
-                    self.files_hash.setdefault(root,id_file_return)
+                     id_file_return=int(s.recv(1024).decode('utf-8'))
+                     self.files_hash.setdefault(root,id_file_return)
+                    else:
+                     self.__files.append(hash)
+                     self.__files_system.setdefault(hash,[])
+                     self.files_hash.setdefault(root,cut_root+self.__id+","+hashlib.sha256(file).hexdigest())
+                    
                     for nodo in self.node_list:
                         if nodo!=self.__ip:
                             if node_control[self.node_list.index(nodo)]==True:
@@ -363,9 +372,10 @@ class Node:
                         s.close()
                         s.connect(ip,8008)
                         s.send(chord_protocol.save_file())          #Hacer que los nodos confirmen cuando hayan realizado el almacenamiento
-                        s.sendfile(file)
                         s.send(str(id))
                         s.send(cut_root)
+                        s.sendfile(file)
+                        s.send("")
                         data=s.recv(1024)
                         if not data.decode('utf-8')==chord_protocol.save_file():
                             return False
@@ -449,16 +459,18 @@ class Node:
             elif data=="1008: Get Successor":
                 conn.send("{}".format(self.__successor))
             elif data=="1006: Save File":
-                file_text=conn.recv(1024*5).decode('utf-8')
-                hash=hashlib.sha256(file_text).hexdigest()
                 id=conn.recv(1024).decode('utf-8')
                 root=conn.recv(1024).decode('utf-8')
-                with open(root+str(id)+","+hash, "wb") as file:
+                file_text=conn.recv(1024)
+                hash=hashlib.sha256(file_text).hexdigest()
+                while file_text!="":
+                 with open(root+str(id)+","+hash, "wb") as file:
                     file.write(file_text)
+                    file_text=conn.recv(1024)
                 self.__files.append(hash)
                 self.__files_system.setdefault(hash,[])
                 conn.send(b"Save")
-                conn.send(str(self.__id)+","+hash)
+                conn.send(str(id)+","+hash)
             elif data=="1003: Update File":
                 data=conn.recv(1024).decode('utf-8')
                 self.__files_system.keys= json.loads(data)
@@ -641,7 +653,7 @@ class Node:
                     idNodoParaEnviarPeticion+=1
 
     def processes_request(self):
-      threading.Thread(target=self.countdown(), args=(200)).start()   #Este temporizador es para estabilizar el sistema cada un tiempo determinado
+      threading.Thread(target=self.countdown(), args=(900)).start()   #Este temporizador es para estabilizar el sistema cada un tiempo determinado
       threading.Thread(target=self.get_requests_system(), args=()).start()
       
       while stabilized_system and not self.finish_countdown:
