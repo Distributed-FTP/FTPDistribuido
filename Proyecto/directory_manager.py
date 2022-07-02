@@ -146,7 +146,7 @@ class Directory_Manager():
         files.replace("//", "/")
         while True:
             bytes_recieved = socket_client.recv(self.__buffer)
-            self.__node.upload_file(self.path_default + file_name, read_mode, bytes_recieved)
+            self.__node.upload_file(bytes_recieved, self.path_default + file_name)
                 
             if bytes_recieved == b'':
                 break            
@@ -231,7 +231,7 @@ class Directory_Manager():
         return False
         
     def get_file_size(self, file_name: str):
-        return os.path.getsize(self.path_default + self.route_path + file_name)
+        return self.__node.get_size_file(self.path_default + self.route_path + file_name)
      
    
     #All
