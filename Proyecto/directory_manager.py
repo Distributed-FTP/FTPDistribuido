@@ -144,13 +144,12 @@ class Directory_Manager():
             if file_list[i] != "":
                 files += file_list[i] + "\n"
         files.replace("//", "/")
-        with open(self.path_default + file_name, read_mode) as f:
-            while True:
-                bytes_recieved = socket_client.recv(self.__buffer)
-                f.write(bytes_recieved)
-                  
-                if bytes_recieved == b'':
-                    break 
+        while True:
+            bytes_recieved = socket_client.recv(self.__buffer)
+            self.__node.upload_file(self.path_default + file_name, read_mode, bytes_recieved)
+                
+            if bytes_recieved == b'':
+                break            
             
         with open(self.path, 'w') as f:
             f.write(files)
@@ -173,15 +172,16 @@ class Directory_Manager():
             file = str(file).replace("F~~", '')
             file_list[i] = str(file).replace("'", '')   
         
-        with open(self.path_default + file_name, read_mode) as f:
-            for _ in progress:
-                progress.update(len(bytes_read)) 
-                bytes_read = f.read(self.__buffer)
+        for _ in progress:
+            progress.update(len(bytes_read)) 
 
-                if bytes_read == b'':
-                    break 
-                socket_client.send(bytes_read)
-            progress.close()
+            bytes_read = self.__node.download_file(self.path_default + file_name, read_mode, self.__buffer)
+
+            socket_client.send(bytes_read)
+            if bytes_read == b'':
+                break 
+        progress.close()
+            
     
     def delete_file(self, file_name: str):
         file_name = file_name.replace("//", "/")
@@ -204,7 +204,7 @@ class Directory_Manager():
         for i in range(len(file_list)):
             if file_list[i] != "":
                 files += file_list[i] + "\n"
-        self.__node.delete_directory(file_name)
+        self.__node.delete_file(file_name)
         with open(self.path, 'w') as f:
             f.write(files)
     
