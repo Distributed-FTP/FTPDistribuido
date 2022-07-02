@@ -658,7 +658,7 @@ class Node:
                 if self.__ip!= ip+str(i) and self.NodosEncontrados.count(ip+str(i))==0:  
                   try:
                     s.connect((ip+str(i), 8003))
-                    s.send(b"Code 399")
+                    s.send(b"Code #399#")
                     data=s.recv(1024).decode('utf-8')
                     if data=="Code #400#":
                         self.leader_calls=True
