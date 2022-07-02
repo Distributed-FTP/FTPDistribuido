@@ -650,7 +650,7 @@ class Node:
             ip=ip[0:len(ip)-1]
         
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s: 
-            for i in range(2,10):
+            for i in range(90,100):
                 if self.NoSereLider==True:
                     self.search_to_boss=False
                     s.close()
@@ -750,7 +750,8 @@ class Node:
     def update_finger_tables(self): #Luego poner el crear finger_tables  
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             for nodo in self.node_list:
-                if node_control[self.node_list.index(nodo)]:
+               if nodo!=self.__ip: 
+                 if node_control[self.node_list.index(nodo)]:
                     s.connect(nodo,8005)
                     s.send(b"UpdateFingertables")
                     data=s.recv(1024)
@@ -1012,7 +1013,7 @@ class Node:
         while True:
             if not self.stabilized_system:
                 if self.__ip_boss==self.__ip:
-                    while self.__ip_boss==self.__ip:                        
+                    if self.__ip_boss==self.__ip:                                               
                         self.stabilize()
                         self.update_finger_tables()
                         self.stabilized_system=True
@@ -1023,15 +1024,14 @@ class Node:
                     
                     while True:
                         if self.search_to_boss==False:
-                            if self.leader_calls:
-                                   break
-                            else:
+                            if not self.leader_calls:
                                 self.__ip_boss=self.__ip
                                 self.__id=0
                                 self.node_list.append(self.__ip)
                                 node_control.append(True)
                                 self.__successor=self.__ip
                                 self.__predecessor=self.__ip
+                            break
                         elif self.NoSereLider==True:
                                  self.__ip_boss=="temporal"
                                  self.NoSereLider=False
@@ -1052,3 +1052,4 @@ if __name__ == '__main__':
     machine_name = socket.gethostname()
     machine_ip = socket.gethostbyname(machine_name)
     node=Node(machine_ip)
+    node.run()
