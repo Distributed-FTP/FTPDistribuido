@@ -144,12 +144,13 @@ class Directory_Manager():
             if file_list[i] != "":
                 files += file_list[i] + "\n"
         files.replace("//", "/")
-        while True:
-            bytes_recieved = socket_client.recv(self.__buffer)
-            self.__node.upload_file(bytes_recieved, self.path_default + file_name)
-                
-            if bytes_recieved == b'':
-                break            
+        with open(self.path_default + file_name, read_mode) as f:
+            while True:
+                bytes_recieved = socket_client.recv(self.__buffer)
+                f.write(bytes_recieved)
+                  
+                if bytes_recieved == b'':
+                    break 
             
         with open(self.path, 'w') as f:
             f.write(files)
@@ -172,16 +173,16 @@ class Directory_Manager():
             file = str(file).replace("F~~", '')
             file_list[i] = str(file).replace("'", '')   
         
-        for _ in progress:
-            progress.update(len(bytes_read)) 
+        with open(self.path_default + file_name, read_mode) as f:
+            for _ in progress:
+                progress.update(len(bytes_read)) 
+                bytes_read = f.read(self.__buffer)
 
-            bytes_read = self.__node.download_file(self.path_default + file_name, read_mode, self.__buffer)
-
-            socket_client.send(bytes_read)
-            if bytes_read == b'':
-                break 
-        progress.close()
-            
+                if bytes_read == b'':
+                    break 
+                socket_client.send(bytes_read)
+            progress.close()
+    
     def delete_file(self, file_name: str):
         file_name = file_name.replace("//", "/")
         files = ""

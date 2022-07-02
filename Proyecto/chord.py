@@ -824,6 +824,11 @@ class Node:
     
     def state_file(self,root):
         
+        try:
+            return os.stat(root)
+        except:
+            None
+        
         file_id=self.files_hash[root]
         
         hash_code = file_id
