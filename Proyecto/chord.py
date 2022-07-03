@@ -703,6 +703,16 @@ class Node:
                 id=conn.recv(1024).decode('utf-8')
                 root=conn.recv(1024).decode('utf-8')
                 conn.send(self.find_file(None,None,id,Search_Type.FILE_SIZE,root))
+            elif data=="New File":
+                data=conn.recv(1024)
+                while data != "":
+                    data=conn.recv(1024)
+                    keys=json.loads(data)
+                    data=conn.recv(1024)
+                    values=json.loads(data)
+                    for i in range(0,len(keys)-1):
+                     self.files_hash.setdefault(keys[i],values[i])           
+                    data=conn.recv(1024)
 
         conn.close()
 
@@ -781,15 +791,22 @@ class Node:
                 except:
                     None
             
-            if len(new_files_keys)>0:
+        if len(new_files_keys)>0:
                 for nodo in self.node_list:
-                 if nodo!=self.__ip:
+                 if nodo!=self.__ip and node_control[self.node_list.index(nodo)]:
                       if nodo==self.__ip_boss:
                             conn.send(b"New")   
                             conn.send(json.dumps(new_files_keys))
                             conn.send(json.dumps(new_files_keys))
+                            conn.send("")
                       else:
-
+                        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                            s.connect(nodo,8005)
+                            s.send(b"New File")   
+                            s.send(json.dumps(new_files_keys))
+                            s.send(json.dumps(new_files_keys))
+                            s.send("")
+                           
 
         
         
@@ -1011,18 +1028,28 @@ class Node:
                             s.send(b"{}".__format__(str(self.node_list.index(ip)).encode('utf-8')))
                         else:
                             s.send(b"")
-                        if nodo==ip and not soyNuevo:
-                            s.send(b"Reconectando")
+                        if nodo==ip:
+                            if not soyNuevo:
+                             s.send(b"Reconectando")
+
+                            else:
+                             s.send(b"")
+                             send_list=json.dumps(list(self.files_hash.keys()))
+                             s.send(b"{}".__format__(send_list))
+                             send_list=json.dumps(list(self.files_hash.values()))
+                             s.send(b"{}".__format__(send_list))
+                             data=s.recv(1024)
+                             while data != "":
+                                data=s.recv(1024)
+                                keys=json.loads(data)
+                                data=s.recv(1024)
+                                values=json.loads(data)
+                                for i in range(0,len(keys)-1):
+                                   self.files_hash.setdefault(keys[i],values[i])           
+                                data=s.recv(1024)
                         else:
                             s.send(b"")
-                            send_list=json.dumps(list(self.files_hash.keys()))
-                            s.send(b"{}".__format__(send_list))
-                            send_list=json.dumps(list(self.files_hash.values()))
-                            s.send(b"{}".__format__(send_list))
-                            data=s.recv(1024)
-                            while data != "":
-                                nuevosNodos=
-                                data=s.recv(1024)
+
                         
                         
 
@@ -1081,6 +1108,7 @@ class Node:
               COMMAND=conn.recv(1024)
               if COMMAND.decode('utf-8')=="Reconectando":
                   
+                  
                   with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:            
                               s.connect(self.__files_system[archivo][2],8005)
                               s.send(b"Dime si esta")
@@ -1100,12 +1128,9 @@ class Node:
                                   nuevosArchivos.append(archivo)      
                   self.__files=nuevosArchivos     
                 
-              else:
+              elif COMMAND.decode('utf-8')!="":
                    self.get_files(conn)
                    conn.close()
-                      
-
-
                   
           elif COMMAND.decode('utf-8')=="UpdateFingertables":
               for i in range(6):
