@@ -5,7 +5,7 @@ from dataclasses import field
 from errno import ELIBBAD
 import hashlib
 from itertools import count
-from logging import root
+from logging import RootLogger, root
 from multiprocessing.sharedctypes import Value
 import os
 from posixpath import split
@@ -179,8 +179,11 @@ class Node:
                     s.send("{}".format(str(id)))
                     s.send("{}".format(hash))
                     s.send("{}".format(root))
-                    s.sendfile(file)           
-                    s.close()
+                    with open(root, 'rb') as f: 
+                      s.sendfile(file)
+                      s.send("")
+                      f.close()
+                    os.remove(root)
                 else:
                     dictionary=self.finger_table
                     value=dictionary.popitem()
@@ -198,7 +201,12 @@ class Node:
                     s.send("{}".format(id))
                     s.send("{}".format(hash))
                     s.send("{}".format(root))
-                    s.sendfile(file)
+                    with open(root, 'rb') as f: 
+                      s.sendfile(file)
+                      s.send("")
+                      f.close()
+                    os.remove(root)
+
         elif search_type== Search_Type.STATE:
                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s: 
                 keys=self.finger_table.keys()
@@ -431,7 +439,7 @@ class Node:
         file.close()
      return True
     
-    def edit_file(self,root, new_root):
+    def edit_file(self,root):
         
         file_id=self.files_hash.get(root)
         
@@ -442,7 +450,17 @@ class Node:
             hash_code=hash_code[1:len(hash_code)-1]
         hash_code=hash_code[1:len(hash_code)-1]
 
-        self.find_file(hash_code, new_root, id, Search_Type.EDIT,root)
+        if self.__files.count(hash_code)==1:
+             with open(root, 'rb') as f: 
+                hash_new=hashlib.sha256(f).hexdigest()
+                self.files_hash.pop(root)
+                self.files_hash.setdefault(root,id+","+hash_new)
+                f.close()
+             
+             
+
+        else:
+          self.find_file(hash_code,None, id, Search_Type.EDIT,root)
     
     def change_name_file(self,root,rootNew):
          with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -535,22 +553,22 @@ class Node:
                 id=conn.recv(1024).decode('utf-8')
                 hash=conn.recv(1024).decode('utf-8')
                 root=conn.recv(1024).decode('utf-8')
-                file_id=id+","+hash
-                file_text=conn.recv(1024*5).decode('utf-8')
-                cut_root=root
-                while cut_root[len(cut_root)-1]!="/":
-                 cut_root=cut_root[0:len(cut_root)-1]
-                os.remove(cut_root+file_id)
+                os.remove(root)
+                data=conn.recv(1024).decode('utf-8')
+                while data!="":
+                    with open(root, "wb") as file:
+                     file.write(data)
+                     data=conn.recv(1024)
 
-                hash_new_file=hashlib.sha256(file_text).hexdigest()
-                with open(cut_root+str(id)+","+hash_new_file, "wb") as file:
-                    file.write(file_text)
+                with open(root, "wb") as file:
+                 hash_new_file=hashlib.sha256(file).hexdigest()
                 
                 ###Editar el archivo y donde quiera que este replicado 
                 #Eliminar El archivo , Guardar EL actual e informar a los demas nodos que lo tienen
-                self.__files_system.setdefault(hash_new_file,self.__files_system[hash])    #anadir el nuevo hash junto a la lista de ips donde esta el archivo
+                self.__files_system.setdefault(hash_new_file,self.__files_system.get(hash))    #anadir el nuevo hash junto a la lista de ips donde esta el archivo
                 self.__files.remove(hash)
                 self.__files.append(hash_new_file) ##Anadir el nuevo hash
+                self.files_hash.pop(root)
                 self.files_hash.setdefault(root,id+","+hash_new_file)
 
                 for nodo in self.node_list:
@@ -563,7 +581,7 @@ class Node:
                             s.send(hash_new_file)
                             s.close()
                  
-                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s: 
+                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:  #Actualizar las replicas
                     for replica in self.__files_system[hash]:
                         if replica!=self.__ip:
                             if node_control[self.node_list.index(replica)]==True:
@@ -571,24 +589,36 @@ class Node:
                                 s.send(chord_protocol.get_replica())
                                 s.send(id)
                                 s.send(hash)
-                                s.send(cut_root)
-                                s.sendfile(file_text)
+                                s.send(root)
+                                with open(root, 'rb') as f:
+                                 s.sendfile(f)
+                                 s.send("")
+                                 f.close()
+                                s.close()
 
-                self.__files.append(hash)
-                self.__files_system[hash]=hash_new_file
+                self.__files_system.pop(hash)
+                self.__files_system.setdefault(hash,hash_new_file)
             elif data=="1010: Get Replica":
                 id=conn.recv(1024).decode('utf-8') 
                 hash=conn.recv(1024).decode('utf-8')
                 root=conn.recv(1024).decode('utf-8')    
-                file_text=conn.recv(1024)
-                hash_new_file=hashlib.sha256(file_text).hexdigest()
-                os.remove(root+id+","+hash)
-                with open(root+id+","+hash_new_file, "wb") as file:
-                    file.write(file_text)
-                self.__files_system[hash]=hash_new_file  
+                os.remove(root)
+                data=conn.recv(1024)
+                while data !="":
+                    with open(root, "wb") as file:
+                     file.write(data)
+                     data=conn.recv(1024)
+                
+                with open(root, "rb") as file:
+                  hash_new_file=hashlib.sha256(file_text).hexdigest()
+                
+                  
                 self.__files_system.setdefault(hash_new_file, self.__files_system[hash])   
                 self.__files.remove(hash)
-                self.__files.append(hash_new_file) 
+                self.__files.append(hash_new_file)
+                self.__files_system.pop(hash)
+                self.__files_system.setdefault(hash,hash_new_file)
+
             elif data=="1001: Search File":
                 id=int(conn.recv(1024).decode('utf-8'))
                 root=conn.recv(1024).decode('utf-8')
@@ -606,9 +636,13 @@ class Node:
                   id=int(conn.recv(1024).decode('utf-8'))
                   hash=conn.recv(1024).decode('utf-8')
                   root=conn.recv(1024).decode('utf-8')
-                  archivo=conn.recv(1024).decode('utf-8')  ##Recibir el archivo 
-                  self.find_file(hash,archivo,id,Search_Type.EDIT,root)
-                ###Mandar el archivo  conn.sendfile
+                  data=conn.recv(1024).decode('utf-8')
+                  while data!="":
+                    with open(root, "wb") as file:
+                     file.write(data)
+                     data=conn.recv(1024)
+                  self.find_file(hash,None,id,Search_Type.EDIT,root)
+                
             elif data=="1000: Get File":
                 id=conn.recv(1024).decode('utf-8')
                 root=conn.recv(1024).decode('utf-8')
@@ -694,8 +728,9 @@ class Node:
                 conn.close()
             elif data=="UPDATE FILE EDITION":
                 root=conn.recv(1024).decode('utf-8')
-                new_hash=conn.recv(1024).decode('utf-8')
-                self.files_hash.setdefault(root,new_hash)
+                new_id=conn.recv(1024).decode('utf-8')
+                self.files_hash.pop(root)
+                self.files_hash.setdefault(root,new_id)
                 conn.close()
             elif data=="SIZE":
                 root=conn.recv(1024).decode('utf-8')
@@ -1037,11 +1072,12 @@ class Node:
 
                             if not soyNuevo:
                              s.send(b"Reconectando")
+                             
 
                             else:
                              s.send(b"Continue")
-                             data=s.recv(1024)
-                             while data != "":
+                            data=s.recv(1024)
+                            while data != "":
                                 data=s.recv(1024)
                                 keys=json.loads(data)
                                 data=s.recv(1024)
@@ -1076,16 +1112,27 @@ class Node:
               COMMAND=conn.recv(1024)
               node_control[int(COMMAND.decode('utf-8'))]=False
           elif COMMAND.decode('utf-8')=="Dime si esta":
+              root=conn.recv(1024).decode('utf-8')
               COMMAND=conn.recv(1024).decode('utf-8')
               if list(self.__files_system.keys()).count(COMMAND)==1:
                   conn.send(b"Esta")
-                  conn.send(json.dumps(self.__files_system.get(COMMAND))) 
-              else:
-                  archivo=self.__files_system[COMMAND][0] ##CargarArchivo
-                  with open('/store/'+str(id)+","+archivo,'rb') as file:
-                      conn.sendfile(file)
-                  NodosEnLosQueEsta= json.dumps(self.__files_system[archivo]) ##Indexar en el hash del archivo
-                  conn.send(NodosEnLosQueEsta)  
+                  if len(self.__files_system.get(COMMAND))>1:
+                      conn.send(json.dumps(self.__files_system.get(COMMAND)))
+                      conn.send("")
+                  else:
+                      
+                      hashnew=self.__files_system.get(COMMAND)
+                      hashnew=hashnew[0]
+                      conn.send(json.dumps(self.__files_system.get(hashnew)))
+                      conn.send("Actualiza")
+                      conn.send(hashnew)
+                      with open(root, 'rb') as f:
+                          conn.sendfile(f)
+                          conn.send("")
+                             
+                  conn.send(b"Esta")
+                  conn.send(json.dumps(self.__files_system.get(COMMAND)))
+                
           elif COMMAND.decode('utf-8')=="JOIN":
               COMMAND=conn.recv(1024)
               node_control= json.loads(COMMAND.decode('utf-8'))
@@ -1135,13 +1182,13 @@ class Node:
                         new_files_Values.append(self.__id+","+hash)
                         self.__files.append(hash)
                         self.__files_system.setdefault(hash,[self.__ip])
+
                        else:
-                         
-                         
                          
                          with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
                               s.connect(self.__successor,8005)
                               s.send(b"Dime si esta")
+                              s.send(root)
                               s.send(hash)
                               data=s.recv(1024).decode('utf-8')
                               if data=="Esta":
@@ -1185,35 +1232,29 @@ class Node:
                                 else:
                                     self.__files.append(hash)
                                     self.__files_system.setdefault(hash,[self.__ip])
+                                    self.files_hash
 
                       except:
                         None
-                  
-                  
-                  
-                  #with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:            
-                  #      for file in self.:
-                  #          if nodo!=self.__ip and node_control[self.node_list.index(nodo)]:
-                  #              if nodo==self.__ip_boss:
-                  #                print("llenarl")    
-                  #              else:                                   
-                   #               s.connect(nodo,8005)
-                   #               s.send(b"Dime si esta")
-                   ##               s.send(archivo)
-                    #              s.send(ids[self.__files.index[archivo]])
-                    #          data=s.recv(1024).decode('utf-8')
-                    #          if data!="Esta":
-                    #              os.remove(str(self.id)+","+archivo)
-                    #              archivo=s.recv(1024*5)
-                    #              hash=hashlib.sha256(archivo).hexdigest()
-                    #              with open('/store/'+str(ids[self.__files.index[archivo]])+","+hash,"wb") as file:
-                    #                  file.write(archivo)
-                    #              nodosEnlosqueEsta=json.loads(s.recv(1024).decode('utf-8'))
-                    #              nuevosArchivos.append(data)
-                    #              self.__files_system.setdefault(data,nodosEnlosqueEsta)
-                    #          else:
-                    #              nuevosArchivos.append(archivo)      
-                 # self.__files=nuevosArchivos     
+
+                  if len(new_files_keys)>0:
+                    for nodo in self.node_list:
+                     if nodo!=self.__ip and node_control[list(self.node_list).index(nodo)]:
+                      if nodo==self.__ip_boss:
+                            conn.send(b"New")   
+                            conn.send(json.dumps(new_files_keys))
+                            conn.send(json.dumps(new_files_keys))
+                            conn.send("")
+                      else:
+                        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                            s.connect(nodo,8005)
+                            s.send(b"New File")   
+                            s.send(json.dumps(new_files_keys))
+                            s.send(json.dumps(new_files_keys))
+                            s.send("")
+                  else:
+                    conn.send("")
+                    conn.close()
                 
               elif COMMAND.decode('utf-8')!="":
                    self.get_files(conn)
