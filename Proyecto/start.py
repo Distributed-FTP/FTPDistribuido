@@ -9,7 +9,7 @@ from threading import Thread
 IP = '0.0.0.0'
 PORT = 21
 path = os.getcwd()
-
+node = Node(IP, path)
 
 def server_listener():
     global listen_sock
@@ -23,7 +23,8 @@ def server_listener():
     listen_sock.listen(5)
     log.LogMessageServer(f'Servidor iniciado en {listen_sock.getsockname( )}\n')
     while True:
-        node = Node(IP, path)
+        listener = Thread(target=node.run)
+        listener.start()
         directory_manager = Directory_Manager(path, node)
         connection, address = listen_sock.accept()
         connection.settimeout(5)
