@@ -63,6 +63,7 @@ class Node:
         self.NoSereLider=False
         self.files_hash=dict()
         self.path=path
+
         
         
         #Todo Nodo debe saber si es el lider , en caso de que lo sea debe realizar acciones especificas
@@ -779,7 +780,7 @@ class Node:
                     root=str(self.path + file_list[i])
                     os.stat(root)
                     hash=hashlib.sha3_256(root.encode()).hexdigest()
-                    if self.files_hash.get(hash)==None:
+                    if self.files_hash.get(root)==None:
                      self.files_hash.setdefault(root,self.__id+","+hash)
                      new_files_keys.append(root)
                      new_files_Values.append(self.__id+","+hash)
@@ -1106,30 +1107,79 @@ class Node:
 
               COMMAND=conn.recv(1024)
               if COMMAND.decode('utf-8')=="Reconectando": 
-                  with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:            
-                        for nodo in self.node_list:
-                            if nodo!=self.__ip and node_control[self.node_list.index(nodo)]:
-                                if nodo==self.__ip_boss:
-                                     
-                                else:
-                                   
-                              s.connect(self.__files_system[archivo][2],8005)
+                  new_files_keys=[]
+                  new_files_Values=[]
+                  files = ""
+                  with open(self.path + "/Reports/files.fl", 'rb') as f:
+                   while True:
+                    bytes_read = f.read()
+                    if bytes_read == b'':
+                      break
+                    else:
+                     files += str(bytes_read)
+                  file_list = files.split("\\n")
+                  for i in range(len(file_list)):
+                   file = str(file_list[i]).replace("b'", '')
+                   file_list[i] = str(file).replace("'", '')
+                  for i in range(len(file_list)):
+                   if file_list[i].__contains__("F~~"):
+                      file_list[i] = file_list[i].replace("F~~", '')
+                      try:
+                       root=str(self.path + file_list[i])
+                       os.stat(root)
+                       hash=hashlib.sha3_256(root.encode()).hexdigest()
+                       if self.files_hash.get(root)==None:
+                        self.files_hash.setdefault(root,self.__id+","+hash)
+                        new_files_keys.append(root)
+                        new_files_Values.append(self.__id+","+hash)
+                        self.__files.append(hash)
+                        self.__files_system.setdefault(hash,[self.__ip])
+                       else:
+                         self.__files.append(hash)
+                         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                              s.connect(self.__successor,8005)
                               s.send(b"Dime si esta")
-                              s.send(archivo)
-                              s.send(ids[self.__files.index[archivo]])
+                              s.send(hash)
                               data=s.recv(1024).decode('utf-8')
                               if data!="Esta":
-                                  os.remove(str(self.id)+","+archivo)
-                                  archivo=s.recv(1024*5)
-                                  hash=hashlib.sha256(archivo).hexdigest()
-                                  with open('/store/'+str(ids[self.__files.index[archivo]])+","+hash,"wb") as file:
-                                      file.write(archivo)
-                                  nodosEnlosqueEsta=json.loads(s.recv(1024).decode('utf-8'))
-                                  nuevosArchivos.append(data)
-                                  self.__files_system.setdefault(data,nodosEnlosqueEsta)
+                                s.close()
+                                s.connect(self.__predecessor,8005)
+                                s.send(b"Dime si esta")
+                                s.send(hash)
+                                data=s.recv(1024).decode('utf-8')
+                                if data!="Esta":
                               else:
-                                  nuevosArchivos.append(archivo)      
-                  self.__files=nuevosArchivos     
+                                replicas=json.loads(s.recv(1024))
+                                if len(replicas)==1
+
+                      except:
+                        None
+                  
+                  
+                  
+                  #with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:            
+                  #      for file in self.:
+                  #          if nodo!=self.__ip and node_control[self.node_list.index(nodo)]:
+                  #              if nodo==self.__ip_boss:
+                  #                print("llenarl")    
+                  #              else:                                   
+                   #               s.connect(nodo,8005)
+                   #               s.send(b"Dime si esta")
+                   ##               s.send(archivo)
+                    #              s.send(ids[self.__files.index[archivo]])
+                    #          data=s.recv(1024).decode('utf-8')
+                    #          if data!="Esta":
+                    #              os.remove(str(self.id)+","+archivo)
+                    #              archivo=s.recv(1024*5)
+                    #              hash=hashlib.sha256(archivo).hexdigest()
+                    #              with open('/store/'+str(ids[self.__files.index[archivo]])+","+hash,"wb") as file:
+                    #                  file.write(archivo)
+                    #              nodosEnlosqueEsta=json.loads(s.recv(1024).decode('utf-8'))
+                    #              nuevosArchivos.append(data)
+                    #              self.__files_system.setdefault(data,nodosEnlosqueEsta)
+                    #          else:
+                    #              nuevosArchivos.append(archivo)      
+                 # self.__files=nuevosArchivos     
                 
               elif COMMAND.decode('utf-8')!="":
                    self.get_files(conn)
