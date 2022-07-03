@@ -17,6 +17,12 @@ Basado en la definición de RFC 959 hicimos una implementación de FTP. Tenemos 
 * Una clase encargada de dejar registrado todas las acciones realizadas por los usuarios en busca de una mayor seguridad en nuestro sistema (log.py)
 * Una clase estática con la lista de respuestas posibles para todos los comandos que propone la documentación de RFC (return_codes.py)
 * Una clase estática que contiene todas las ayudas posibles que brindará nuestro sistema (help.py)
+* Una clase que se encarga de manipular los archivos y la direcciones y comunicarse con el nodo de Chord asociado (directory_manager.py)
+* Una clase Admin que se encarga de agregar o eliminar permisos a nuestro servidor FTP (admin.py)
+* La clase Chord que se encarga de implementar dicho algoritmo (chord.py).
+* El directorio Accesories contiene clases útiles a nuestro sistema para encargarse de responsabilidades secundarias a nuestro hilo principal de desarrollo.
+* El directorio Reports contiene 3 archivos, **database.db** que contiene las cuentas de accesos de los distintos usuarios a nuestro sistema, **files.fl** que contiene la lista de archivos presente en nuestro sistema, **register.log** que contiene la lista de logs que se han sucedido en el sistema  desde su inicio.
+* El directorio root es la carpeta raíz a partir de la que se va a forjar la jerarquía de nuestros sistema de ficheros.
 
 ## **[start.py](https://github.com/Distributed-FTP/FTPDistribuido/blob/master/Proyecto/start.py)**
 Esta clase contiene la configuración inicial de nuestro servidor, mediante la utilización de sockets y de hilos se logra gestionar varias conexiones de distintos clientes al mismo servidor. Nos vimos forzados a implementar esta idea dado que FileZilla utiliza varias conexiones con un mismo usuario, por ejemplo, cada vez que se envía/recibe alguna información por la conexción de datos se hace necesario que se desconecte y conecte nuevamente. Para una conexión definimos un tiempo de espera de 5 segundos de manera que cuando haya inactividad deja de escuchar por ese hilo hasta una nueva conexión.
@@ -24,14 +30,14 @@ Esta clase contiene la configuración inicial de nuestro servidor, mediante la u
 ## **[ftp.py](https://github.com/Distributed-FTP/FTPDistribuido/blob/master/Proyecto/ftp.py)**
 Esta clase implementa el protocolo FTP en sí, Cuando se inicia el servidor se envía al cliente un mensaje de bienvenida para que el cliente sepa que se recibió correctamente la conexión y ya se puede comenzar a intercambiar información. Se recibe el mensaje del socket y se procesa la orden, se deocdifica a UTF-8 y se analiza la primera palabra de la línea y así se busca en una lista cuál es el comando correcto. Si el comando no aparece en la lista se devuelve un mensaje que el comando no fue definido. Es importante destacar que el protocolo FTP trabaja con 2 conexiones por cada cliente, una conexión de control que es por donde se transfieren las respuestas de los comandos para facilitar la comunicación con el cliente y ua conexión de datos que es por donde se van a mover los archivos y demás información.
 
-## **[log.py](https://github.com/Distributed-FTP/FTPDistribuido/blob/master/Proyecto/log.py)**
-Esta clase contiene varios métodos que escriben todas las operaciones que realiza un cliente en el archivo "register.log", le decidimos dar un formato con bastante información, ya que contiene la fecha y hora, el IP y PUERTO por el que se realizó la operación y si es una operación que requiere que el usuario se haya autenticado también se almacena el nombre del usuario.
+## **[directory_manager.py](https://github.com/Distributed-FTP/FTPDistribuido/blob/master/Proyecto/directory_manager.py)**
+La clase de manager de directorios es la encargada de gestionar todo lo relacionado con directorios y archivos. Ella po sí sola se encarga de comunicarse con el nodo de Chord para que este le haga llegar el archivo solicitado.
 
-## **[return_codes.py](https://github.com/Distributed-FTP/FTPDistribuido/blob/master/Proyecto/return_codes.py)**
-En esta clase tenemos definido todos los códigos de respuesta que daría nuestro sistema al ejecutar cualquier operación, ya sea su resultado satisfactorio o no.
+## **[admin.py](https://github.com/Distributed-FTP/FTPDistribuido/blob/master/Proyecto/admin.py)**
+La clase Admin contiene una pequeña implemetación de un pequeño cliente que permite manipular los accesos de los uaurios, o sea, añadir o eliminar nombres de usuarios y contraseñas de clientes.
 
-## **[help.py](https://github.com/Distributed-FTP/FTPDistribuido/blob/master/Proyecto/help.py)**
-La clase de ayuda contiene las ayduas, valga la redundancia, de todos los comandos que tenemos implementados. Así como una ayuda general que le dice al usuario que parámetros pasarle al comando HELP para acceder a alguna en específico.
+## **[chord.py](https://github.com/Distributed-FTP/FTPDistribuido/blob/master/Proyecto/chord.py)**
+La clase Chord contiene las tallas turbias de Chord....
 
 ## **Comandos implementados**
 Login | Logout | Parámetros de transferencia | Acciones sobre ficheros | Ordenes informativas | Otras órdenes
@@ -49,5 +55,9 @@ Login | Logout | Parámetros de transferencia | Acciones sobre ficheros | Ordene
 |     |      |      | PWD  |      |      |
 |     |      |      | ABOR |      |      |
 
-# **Chord**
-.............
+## **Consideraciones tenidas en cuenta**
+* A la hora de implementar el servidor FTP tenemos como raíz de directorio root, pero si se accede como usuario **anonymous** el root cambia y se accede a otra carpeta.
+* En todos los nodos de Chord tenemos replicada la misma jerarquía de directorios, pero sin los archivos.
+* A la hora de subir un archivo se sube el archivo desde la clase FTP hacia el path donde se debe ubicar, se le notifica a Chord, este coge el archivo lo alamcena en los nodos que tienen capacidad de almacenamiento y carga necesaria y luego lo borra del nodo que lo subió para aligerar la carga.
+* A la hora de bajar un archivo se hace un proceso similar al de subida, pero primero se le notifica que se quiere bajar el archivo con path "/root/....." Chord busca en que nodo está y lo trae hacia el nodo que lo solicitó y lo ubica en su dirección, el servidor de FTP recbe la respuesta de que puede manipular el archivo, lo envía al cliente que lo solicitó y se le notifica a Chord que puede eliminarlo si no es su ubicación origial.
+* Todo el tiempo mantenemos replicada la carpeta Reports para lograr tener todos los logs de la red en todos los nodos, todos los accesos a la red en todos los nodos y la jerarquía de archivos presentes en toda nuestra red de servidores.
