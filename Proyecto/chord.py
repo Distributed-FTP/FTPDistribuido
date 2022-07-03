@@ -876,14 +876,15 @@ class Node:
         while ip[len(ip)-1]!='.':
             ip=ip[0:len(ip)-1]
         
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s: 
-            for i in range(90,100):
+         
+        for i in range(9,10):
                 if self.NoSereLider==True:
                     self.search_to_boss=False
                     s.close()
                     break
                 if self.__ip!= ip+str(i) and self.NodosEncontrados.count(ip+str(i))==0:  
                   try:
+                   with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s: 
                     s.connect((ip+str(i), 8003))
                     s.send(b"Code #399#")
                     data=s.recv(1024).decode('utf-8')
@@ -898,8 +899,8 @@ class Node:
                     s.close()
                   except:
                     continue
-            s.close()
-            self.search_to_boss=False
+        s.close()
+        self.search_to_boss=False
         
     def wait_update_boss(self):
         SERVER_PORT = 8002
