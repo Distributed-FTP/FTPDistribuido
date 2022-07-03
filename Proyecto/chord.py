@@ -16,6 +16,7 @@ import socket
 import json
 import threading
 from subprocess import Popen, PIPE
+from markupsafe import HasHTML
 from requests import request 
 from setuptools import Command 
 from ping3 import ping
@@ -472,7 +473,20 @@ class Node:
             hash_code=hash_code[1:len(hash_code)-1]
        hash_code=hash_code[1:len(hash_code)-1]
 
-       self.find_file(hash_code, None, id, Search_Type.DELETE,root)
+       if self.__files.count(hash)==1:               
+              self.__files.remove(hash)
+              for nodo in self.__files_system.get(hash):
+                  if nodo!=self.__ip:
+                    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s: 
+                          s.connect(nodo,8008)
+                          s.send(b"DELETE REPLICA")
+                          s.send("{}".format(str(id)))
+                          s.send("{}".format(hash))
+                          s.send("{}".format(root))
+                          s.close()
+                     
+       else:
+         self.find_file(hash_code, None, id, Search_Type.DELETE,root)
 
     def get_requests_system(self):
         server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -639,8 +653,11 @@ class Node:
                 self.files_hash.setdefault(rootNew,file_id)
             elif data=="DELETE REPLICA":
                 id=conn.recv(1024).decode('utf-8')
+                hash=conn.recv(1024).decode('utf-8')
                 root=conn.recv(1024).decode('utf-8')
                 os.remove(root)
+                self.__files.remove(hash)
+                self.__files_system.pop(hash)
             elif data=="SEARCH FOR DELETE":
                 id=conn.recv(1024).decode('utf-8')
                 hash=conn.recv(1024).decode('utf-8')
@@ -658,8 +675,11 @@ class Node:
                           s.connect(nodo,8008)
                           s.send(b"DELETE REPLICA")
                           s.send("{}".format(str(id)))
+                          s.send("{}".format(hash))
                           s.send("{}".format(root))
-                          s.close() 
+                          s.close()
+                self.__files.remove(hash)
+                self.__files_system.pop(hash) 
             elif data=="DELETE":
                 root=conn.recv(1024).decode('utf-8')
                 self.files_hash.pop(root)
