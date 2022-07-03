@@ -1,5 +1,6 @@
 import os
 import socket, sys
+import time
 from chord import Node
 from directory_manager import Directory_Manager
 from ftp import ServerFTP
@@ -10,6 +11,8 @@ IP = '0.0.0.0'
 PORT = 21
 path = os.getcwd()
 node = Node(IP, path)
+Thread(target=node.run).start()
+time.sleep(10)
 
 def server_listener():
     global listen_sock
@@ -21,8 +24,6 @@ def server_listener():
     log.LogMessageServer('Binding... \n')
     listen_sock.bind((IP, PORT))
     listen_sock.listen(5)
-    listener = Thread(target=node.run)
-    listener.start()
     log.LogMessageServer(f'Servidor iniciado en {listen_sock.getsockname( )}\n')
     while True:
         directory_manager = Directory_Manager(path, node)

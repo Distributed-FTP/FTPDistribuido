@@ -778,7 +778,7 @@ class Node:
           #            self.download_file(request)
           #    if request=="editar":
            #           self.edit_file(request,request)
-           print("ff")
+           None
           
     def get_requests(self):
         server = socket.socket(
@@ -808,16 +808,17 @@ class Node:
         for i in range(len(file_list)):
             if file_list[i].__contains__("F~~"):
                 file_list[i] = file_list[i].replace("F~~", '')
+                
+                root=str(self.path + file_list[i])
+                os.stat(root)
+                hash=hashlib.sha3_256(root.encode()).hexdigest()
                 try:
-                    root=str(self.path + file_list[i])
-                    os.stat(root)
-                    hash=hashlib.sha3_256(root.encode()).hexdigest()
                     if self.files_hash.get(root)==None:
-                     self.files_hash.setdefault(root,self.__id+","+hash)
-                     new_files_keys.append(root)
-                     new_files_Values.append(self.__id+","+hash)
-                     self.__files.append(hash)
-                     self.__files_system.setdefault(hash,[self.__ip])
+                        self.files_hash.setdefault(root,str(self.__id)+","+hash)
+                        new_files_keys.append(root)
+                        new_files_Values.append(str(self.__id)+","+hash)
+                        self.__files.append(hash)
+                        self.__files_system.setdefault(hash,[self.__ip])
                     else:
                         os.remove(root)
                 except:
@@ -1395,5 +1396,5 @@ class Node:
 if __name__ == '__main__':
     machine_name = socket.gethostname()
     machine_ip = socket.gethostbyname(machine_name)
-    node=Node(machine_ip,os.getcwd)
+    node=Node(machine_ip,os.getcwd())
     node.run()
