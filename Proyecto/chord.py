@@ -818,7 +818,6 @@ class Node:
                      new_files_Values.append(self.__id+","+hash)
                      self.__files.append(hash)
                      self.__files_system.setdefault(hash,[self.__ip])
-
                     else:
                         os.remove(root)
                 except:
