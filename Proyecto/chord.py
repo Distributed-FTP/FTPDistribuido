@@ -1396,5 +1396,5 @@ class Node:
 if __name__ == '__main__':
     machine_name = socket.gethostname()
     machine_ip = socket.gethostbyname(machine_name)
-    node=Node(machine_ip,os.getcwd)
+    node=Node(machine_ip,os.getcwd())
     node.run()
