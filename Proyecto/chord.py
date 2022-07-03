@@ -1029,15 +1029,16 @@ class Node:
                         else:
                             s.send(b"")
                         if nodo==ip:
+                            send_list=json.dumps(list(self.files_hash.keys()))
+                            s.send(b"{}".__format__(send_list))
+                            send_list=json.dumps(list(self.files_hash.values()))
+                            s.send(b"{}".__format__(send_list))
+
                             if not soyNuevo:
                              s.send(b"Reconectando")
 
                             else:
-                             s.send(b"")
-                             send_list=json.dumps(list(self.files_hash.keys()))
-                             s.send(b"{}".__format__(send_list))
-                             send_list=json.dumps(list(self.files_hash.values()))
-                             s.send(b"{}".__format__(send_list))
+                             s.send(b"Continue")
                              data=s.recv(1024)
                              while data != "":
                                 data=s.recv(1024)
@@ -1100,16 +1101,18 @@ class Node:
               COMMAND=conn.recv(1024)
               values=json.loads(COMMAND.decode('utf-8'))
               
-              count=0
-              for key in keys:
-                self.files_hash.setdefault(key,values[count])
-                count+=1
+              for i in range(0,len(keys)-1):
+                self.files_hash.setdefault(keys[i],values[i])
 
               COMMAND=conn.recv(1024)
-              if COMMAND.decode('utf-8')=="Reconectando":
-                  
-                  
+              if COMMAND.decode('utf-8')=="Reconectando": 
                   with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:            
+                        for nodo in self.node_list:
+                            if nodo!=self.__ip and node_control[self.node_list.index(nodo)]:
+                                if nodo==self.__ip_boss:
+                                     
+                                else:
+                                   
                               s.connect(self.__files_system[archivo][2],8005)
                               s.send(b"Dime si esta")
                               s.send(archivo)
