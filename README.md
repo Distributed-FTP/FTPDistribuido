@@ -36,6 +36,13 @@ La clase de manager de directorios es la encargada de gestionar todo lo relacion
 ## **[admin.py](https://github.com/Distributed-FTP/FTPDistribuido/blob/master/Proyecto/admin.py)**
 La clase Admin contiene una pequeña implemetación de un pequeño cliente que permite manipular los accesos de los uaurios, o sea, añadir o eliminar nombres de usuarios y contraseñas de clientes.
 
+### Comandos para modificar accesos
+```
+add_user <Username>: Añade nombre de usuario
+add_pass <Password>: Añade contraseña a un nombre de usuario insertado antes
+remove_user <Username>: Elimina nombre de usuario y su contraseña
+```
+
 ## **[chord.py](https://github.com/Distributed-FTP/FTPDistribuido/blob/master/Proyecto/chord.py)**
 La clase Chord contiene las tallas turbias de Chord....
 
@@ -61,3 +68,43 @@ Login | Logout | Parámetros de transferencia | Acciones sobre ficheros | Ordene
 * A la hora de subir un archivo se sube el archivo desde la clase FTP hacia el path donde se debe ubicar, se le notifica a Chord, este coge el archivo lo alamcena en los nodos que tienen capacidad de almacenamiento y carga necesaria y luego lo borra del nodo que lo subió para aligerar la carga.
 * A la hora de bajar un archivo se hace un proceso similar al de subida, pero primero se le notifica que se quiere bajar el archivo con path "/root/....." Chord busca en que nodo está y lo trae hacia el nodo que lo solicitó y lo ubica en su dirección, el servidor de FTP recbe la respuesta de que puede manipular el archivo, lo envía al cliente que lo solicitó y se le notifica a Chord que puede eliminarlo si no es su ubicación origial.
 * Todo el tiempo mantenemos replicada la carpeta Reports para lograr tener todos los logs de la red en todos los nodos, todos los accesos a la red en todos los nodos y la jerarquía de archivos presentes en toda nuestra red de servidores.
+
+## **Reportes**
+
+### database.db
+```
+
+****
+Arnel
+****
+Prueba123*
+****
+
+****
+admin
+****
+admin123*
+****
+
+```
+
+### files.fl
+```
+D~~/root/
+D~~/root/anonymous/
+F~~/root/file.txt/
+```
+
+### register.log
+```
+[2022/07/02 :: 22:34:00]:: Conexion aceptada en ('127.0.0.1', 52872)
+[2022/07/02 :: 22:34:00]:: 127.0.0.1:52872:: El usuario ha insertado un comando no reconocido.
+[2022/07/02 :: 22:34:00]:: 127.0.0.1:52872:: El usuario ha insertado un comando no reconocido.
+[2022/07/02 :: 22:34:00]:: 127.0.0.1:52872:: Usuario Arnel necesita insertar contrasenna.
+[2022/07/02 :: 22:34:00]:: 127.0.0.1:52872:: Usuario Arnel conectado.
+[2022/07/02 :: 22:34:00]:: 127.0.0.1:52872:: El usuario Arnel accedio al directorio /root/.
+[2022/07/02 :: 22:34:00]:: 127.0.0.1:52872:: El usuario Arnel ha activado el tipo I.
+[2022/07/02 :: 22:34:00]:: 127.0.0.1:52872:: El usuario Arnel ha activado el modo pasivo.
+[2022/07/02 :: 22:34:00]:: Conectando a ('127.0.0.1', 49299)
+```
+
