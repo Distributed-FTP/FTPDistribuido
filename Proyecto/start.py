@@ -21,10 +21,10 @@ def server_listener():
     log.LogMessageServer('Binding... \n')
     listen_sock.bind((IP, PORT))
     listen_sock.listen(5)
+    listener = Thread(target=node.run)
+    listener.start()
     log.LogMessageServer(f'Servidor iniciado en {listen_sock.getsockname( )}\n')
     while True:
-        listener = Thread(target=node.run)
-        listener.start()
         directory_manager = Directory_Manager(path, node)
         connection, address = listen_sock.accept()
         connection.settimeout(5)
