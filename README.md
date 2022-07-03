@@ -73,6 +73,7 @@ Login | Logout | Parámetros de transferencia | Acciones sobre ficheros | Ordene
 
 ### database.db
 ```
+
 ****
 Arnel
 ****
@@ -84,13 +85,14 @@ admin
 ****
 admin123*
 ****
+
 ```
 
 ### files.fl
 ```
 D~~/root/
 D~~/root/anonymous/
-D~~/root/New directory/
+F~~/root/file.txt/
 ```
 
 ### register.log
