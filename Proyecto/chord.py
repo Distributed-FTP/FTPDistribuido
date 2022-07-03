@@ -141,15 +141,16 @@ class Node:
                      return "File Download"
                      
                 else:
-                    id_nodes= self.finger_table.values()
-                    pos=len(id_nodes)-1
-                    value=id_nodes[pos]
+                    dictionary=self.finger_table
+                    value=dictionary.popitem()
+                    value=value[1]
+                    
                     while True:
                         if value<id:
                             break
                         else:
-                            pos-=1
-                            value=id_nodes[pos]
+                            value=dictionary.popitem()
+                            value=value[1]
                       
                     s.connect(self.node_list[value],8008)
                     s.send(chord_protocol.search_file())
@@ -177,15 +178,16 @@ class Node:
                     s.sendfile(file)           
                     s.close()
                 else:
-                    id_nodes= self.finger_table.values()
-                    pos=len(id_nodes)-1
-                    value=id_nodes[pos]
+                    dictionary=self.finger_table
+                    value=dictionary.popitem()
+                    value=value[1]
+                    
                     while True:
                         if value<id:
                             break
                         else:
-                            pos-=1
-                            value=id_nodes[pos]
+                            value=dictionary.popitem()
+                            value=value[1]
                           
                     s.connect(self.node_list[value],8008)
                     s.send(chord_protocol.search_for_edit_file())
@@ -208,15 +210,16 @@ class Node:
                     else:
                         return result                  
                 else:
-                    id_nodes= self.finger_table.values()
-                    pos=len(id_nodes)-1
-                    value=id_nodes[pos]
+                    dictionary=self.finger_table
+                    value=dictionary.popitem()
+                    value=value[1]
+                    
                     while True:
                         if value<id:
                             break
                         else:
-                            pos-=1
-                            value=id_nodes[pos]
+                            value=dictionary.popitem()
+                            value=value[1]
                           
                     s.connect(self.node_list[value],8008)
                     s.send(b"1011: STAT")
@@ -234,15 +237,16 @@ class Node:
                     s.send("{}".format(root))           
                     s.close()
                 else:
-                    id_nodes= self.finger_table.values()
-                    pos=len(id_nodes)-1
-                    value=id_nodes[pos]
+                    dictionary=self.finger_table
+                    value=dictionary.popitem()
+                    value=value[1]
+                    
                     while True:
                         if value<id:
                             break
                         else:
-                            pos-=1
-                            value=id_nodes[pos]
+                            value=dictionary.popitem()
+                            value=value[1]
                           
                     s.connect(self.node_list[value],8008)
                     s.send(b"SEARCH FOR DELETE")
@@ -262,15 +266,16 @@ class Node:
                     s.close()
                     return data
                 else:
-                    id_nodes= self.finger_table.values()
-                    pos=len(id_nodes)-1
-                    value=id_nodes[pos]
+                    dictionary=self.finger_table
+                    value=dictionary.popitem()
+                    value=value[1]
+                    
                     while True:
                         if value<id:
                             break
                         else:
-                            pos-=1
-                            value=id_nodes[pos]
+                            value=dictionary.popitem()
+                            value=value[1]
                           
                     s.connect(self.node_list[value],8008)
                     s.send(b"SEARCH FILE_SIZE")
