@@ -43,7 +43,7 @@ def check_ping(host_name):
 
 class Node:
     def __init__(self, ip, path):
-        self.__id=None
+        self.__id=0
         self.__ip=ip
         self.__files=list()  #se guardaran los archivos que esten almacenados en este nodo , mas alla que sea una replica . 
         self.__files_system=dict()  #Aqui se guardara el hash del archivo y en que otros nodos esta
@@ -61,7 +61,7 @@ class Node:
         self.NoSereLider=False
         self.files_hash=dict()
         self.get_files(path)
-
+        self.create_finger_table()
         #Todo Nodo debe saber si es el lider , en caso de que lo sea debe realizar acciones especificas
         # self.finger_table = {((self.__id+(i**2))%2**160) : self.__ip for i in range(160)} #!ID:IP
 
