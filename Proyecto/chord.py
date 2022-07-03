@@ -17,7 +17,7 @@ import socket
 import json
 import threading
 from subprocess import Popen, PIPE
-from markupsafe import HasHTML
+#from markupsafe import HasHTML
 from requests import request 
 from setuptools import Command 
 from ping3 import ping
@@ -823,7 +823,7 @@ class Node:
                 except:
                     None
             
-        if len(new_files_keys)>0:
+        if len(new_files_keys)>0 and conn is not str:
                 for nodo in self.node_list:
                  if nodo!=self.__ip and node_control[self.node_list.index(nodo)]:
                       if nodo==self.__ip_boss:
@@ -1373,7 +1373,7 @@ class Node:
                                 self.__successor=self.__ip
                                 self.__predecessor=self.__ip
                                 self.create_finger_table()
-                                self.get_files(self.path)
+                                self.get_files("Create")
 
                             break
                         elif self.NoSereLider==True:
