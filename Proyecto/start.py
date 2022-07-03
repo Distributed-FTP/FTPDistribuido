@@ -12,7 +12,11 @@ PORT = 21
 path = os.getcwd()
 node = Node(IP, path)
 Thread(target=node.run).start()
-time.sleep(10)
+while True:
+    if len(node.files_hash)>0:
+        print(node.files_hash)
+
+
 
 def server_listener():
     global listen_sock
