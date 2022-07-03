@@ -737,12 +737,11 @@ class Node:
             if file_list[i].__contains__("F~~"):
                 file_list[i] = file_list[i].replace("F~~", '')
                 try:
-                    os.stat(path + file_list[i])
-                    root=path + file_list[i]
-                    with open(root, 'rb') as file: 
-                      hash=hashlib.sha3_256(file).hexdigest()
-                      self.files_hash.setdefault(path+file_list[i],"0,"+hash)
-                      self.__files.append(hash)
+                    root=str(path + file_list[i])
+                    os.stat(root)
+                    hash=hashlib.sha3_256(root.encode()).hexdigest()
+                    self.files_hash.setdefault(root,"0,"+hash)
+                    self.__files.append(hash)
                 except:
                     None
         

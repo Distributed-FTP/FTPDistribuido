@@ -175,6 +175,8 @@ class Directory_Manager():
             file = str(file).replace("F~~", '')
             file_list[i] = str(file).replace("'", '')   
         
+        self.__node.download_file(self.path_default + file_name)
+        
         with open(self.path_default + file_name, read_mode) as f:
             for _ in progress:
                 progress.update(len(bytes_read)) 
@@ -184,7 +186,8 @@ class Directory_Manager():
                     break 
                 socket_client.send(bytes_read)
             progress.close()
-        #self.__node.download_file(self.path_default + file_name)
+        
+        self.__node.update_nodes()
         
     def delete_file(self, file_name: str):
         file_name = file_name.replace("//", "/")
