@@ -61,8 +61,9 @@ class Node:
         self.NodosEncontrados=[]
         self.NoSereLider=False
         self.files_hash=dict()
-        self.get_files(path)
-        self.create_finger_table()
+        self.path=path
+        
+        
         #Todo Nodo debe saber si es el lider , en caso de que lo sea debe realizar acciones especificas
         # self.finger_table = {((self.__id+(i**2))%2**160) : self.__ip for i in range(160)} #!ID:IP
 
@@ -203,7 +204,6 @@ class Node:
                     s.connect(self.node_list[self.finger_table[id]],8008)
                     s.send(b"STAT")
                     s.send(hash)
-                    s.send(id)
                     s.send(root)
                     result=s.recv(1024).decode('utf-8')
                     if result=="False":
@@ -226,6 +226,7 @@ class Node:
                     s.send(b"1011: STAT")
                     s.send("{}".format(id))
                     s.send("{}".format(hash))
+                    s.send("{}".format(root))
                     return s.recv(1024).decode('utf-8')
         elif search_type == Search_Type.DELETE:
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s: 
@@ -428,7 +429,7 @@ class Node:
         file.close()
      return True
     
-    def edit_file(self,root, new_file):
+    def edit_file(self,root, new_root):
         
         file_id=self.files_hash.get(root)
         
@@ -439,7 +440,7 @@ class Node:
             hash_code=hash_code[1:len(hash_code)-1]
         hash_code=hash_code[1:len(hash_code)-1]
 
-        self.find_file(hash_code, new_file, id, Search_Type.EDIT,root)
+        self.find_file(hash_code, new_root, id, Search_Type.EDIT,root)
     
     def change_name_file(self,root,rootNew):
          with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -473,7 +474,8 @@ class Node:
             hash_code=hash_code[1:len(hash_code)-1]
        hash_code=hash_code[1:len(hash_code)-1]
 
-       if self.__files.count(hash)==1:               
+       if self.__files.count(hash)==1:
+              os.remove(root)               
               self.__files.remove(hash)
               for nodo in self.__files_system.get(hash):
                   if nodo!=self.__ip:
@@ -624,10 +626,9 @@ class Node:
                 
             elif data=="STAT":
                 hash=conn.recv(1024).decode('utf-8')
-                id=conn.recv(1024).decode('utf-8')
                 root=conn.recv(1024).decode('utf-8')
                 if self.__files.count(hash)==1:
-                     conn.send(os.stat(root+id+","+hash))
+                     conn.send(os.stat(root))
                 else:
                     conn.send(b"False")
 
@@ -745,9 +746,9 @@ class Node:
             data=conn.recv(1024)           ###Hay que ver como llegan las peticiones
             self.requests.append(data)
 
-    def get_files(self, path):
+    def get_files(self,conn):
         files = ""
-        with open(path + "/Reports/files.fl", 'rb') as f:
+        with open(self.path + "/Reports/files.fl", 'rb') as f:
             while True:
                 bytes_read = f.read()
                 if bytes_read == b'':
@@ -762,11 +763,18 @@ class Node:
             if file_list[i].__contains__("F~~"):
                 file_list[i] = file_list[i].replace("F~~", '')
                 try:
-                    root=str(path + file_list[i])
+                    root=str(self.path + file_list[i])
                     os.stat(root)
                     hash=hashlib.sha3_256(root.encode()).hexdigest()
-                    self.files_hash.setdefault(root,"0,"+hash)
-                    self.__files.append(hash)
+                    if self.files_hash.get(hash)==None:
+                     self.files_hash.setdefault(root,self.__id+","+hash)
+                     conn.send(b"New")   
+                     conn.send(root)
+                     conn.send(self.__id+","+hash)
+                     self.__files.append(hash)
+                     self.__files_system.setdefault(hash,[])
+                    else:
+                        os.remove(root)
                 except:
                     None
         
@@ -913,11 +921,6 @@ class Node:
     
     def state_file(self,root):
         
-        try:
-            return os.stat(root)
-        except:
-            None
-        
         file_id=self.files_hash.get(root)
         
         hash_code = file_id
@@ -926,12 +929,11 @@ class Node:
             id+=hash_code[0]
             hash_code=hash_code[1:len(hash_code)-1]
         hash_code=hash_code[1:len(hash_code)-1]
-        
-        cut_root=root
-        while cut_root[len(cut_root)-1]!="/":
-               cut_root=cut_root[0:len(cut_root)-1]
 
-        return self.find_file(hash_code,None, id, Search_Type.STATE,cut_root)
+        if self.__files.count(hash_code)==1:
+          os.stat(root)
+        else:
+           return self.find_file(hash_code,None, id, Search_Type.STATE,root)
 
     def remove_file(self,root):
         os.remove(root)
@@ -999,6 +1001,17 @@ class Node:
                             s.send(b"Reconectando")
                         else:
                             s.send(b"")
+                            send_list=json.dumps(list(self.files_hash.keys()))
+                            s.send(b"{}".__format__(send_list))
+                            send_list=json.dumps(list(self.files_hash.values()))
+                            s.send(b"{}".__format__(send_list))
+                            data=s.recv(1024)
+                            while data != "":
+                                nuevosNodos=
+                                data=s.recv(1024)
+                        
+                        
+
                         s.close()
                     except:
                         print("Otro nodo entro en el sistema ,se vera cuando lleguemos a el")
@@ -1038,26 +1051,23 @@ class Node:
               COMMAND=conn.recv(1024)
               if COMMAND.decode('utf-8')!="":
                   self.__id=int(COMMAND.decode('utf-8'))
+                  self.create_finger_table()
               self.__ip_boss=addr[0]
+
+              COMMAND=conn.recv(1024)
+              keys= json.loads(COMMAND.decode('utf-8'))
+              COMMAND=conn.recv(1024)
+              values=json.loads(COMMAND.decode('utf-8'))
+              
+              count=0
+              for key in keys:
+                self.files_hash.setdefault(key,values[count])
+                count+=1
+
               COMMAND=conn.recv(1024)
               if COMMAND.decode('utf-8')=="Reconectando":
-                  ids=[]
-                  for archivo in os.listdir(os.getcwd()+'/store'):    ##Aqui cargo los nodos 
-                     nombreDArchivo=archivo
-                     id=""
-                     while nombreDArchivo[0]!=",":
-                        id=nombreDArchivo[0]+id
-                        nombreDArchivo=nombreDArchivo[1:len(nombreDArchivo)]
-                     nombreDArchivo=nombreDArchivo[1:len(nombreDArchivo)]
-                     hash=nombreDArchivo
-                     self.__files.append(hash)
-                     ids.append(id)
                   
-                  with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                      nuevosArchivos=[]  
-                      for archivo in self.__files:
-                          if len(self.__files_system[archivo])>1:
-                              
+                  with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:            
                               s.connect(self.__files_system[archivo][2],8005)
                               s.send(b"Dime si esta")
                               s.send(archivo)
@@ -1074,7 +1084,15 @@ class Node:
                                   self.__files_system.setdefault(data,nodosEnlosqueEsta)
                               else:
                                   nuevosArchivos.append(archivo)      
-                  self.__files=nuevosArchivos       
+                  self.__files=nuevosArchivos     
+                
+              else:
+                   self.get_files(conn)
+                   conn.close()
+                      
+
+
+                  
           elif COMMAND.decode('utf-8')=="UpdateFingertables":
               for i in range(6):
                   id=pow(2,i)+self.__id
@@ -1192,6 +1210,7 @@ class Node:
                                 self.__successor=self.__ip
                                 self.__predecessor=self.__ip
                                 self.create_finger_table()
+                                self.get_files(self.path)
 
                             break
                         elif self.NoSereLider==True:
