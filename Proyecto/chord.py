@@ -319,10 +319,6 @@ class Node:
             id += hash_code[0]
             hash_code = hash_code[1:len(hash_code)-1]
         hash_code = hash_code[1:len(hash_code)-1]
-        
-        cut_root=root
-        while cut_root[len(cut_root)-1]!="/":
-               cut_root=cut_root[0:len(cut_root)-1]
 
         if self.__files.count(hash_code)==1:
             with open(root, 'rb') as f: 
@@ -1255,7 +1251,7 @@ class Node:
                   else:
                     conn.send("")
                     conn.close()
-                
+                  open
               elif COMMAND.decode('utf-8')!="":
                    self.get_files(conn)
                    conn.close()
