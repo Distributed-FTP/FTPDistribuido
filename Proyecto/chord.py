@@ -5,6 +5,7 @@ from dataclasses import field
 from errno import ELIBBAD
 import hashlib
 from itertools import count
+from logging import root
 from multiprocessing.sharedctypes import Value
 import os
 from posixpath import split
@@ -59,7 +60,6 @@ class Node:
         self.NodosEncontrados=[]
         self.NoSereLider=False
         self.files_hash=dict()
-        
         self.get_files(path)
 
         #Todo Nodo debe saber si es el lider , en caso de que lo sea debe realizar acciones especificas
@@ -257,8 +257,6 @@ class Node:
                 if keys.__contains__(id):
                     s.connect(self.node_list[self.finger_table[id]],8008)
                     s.send(b"SIZE")
-                    s.send("{}".format(str(id)))
-                    s.send("{}".format(hash))
                     s.send("{}".format(root))          
                     data=s.recv(1024) 
                     s.close()
@@ -277,12 +275,12 @@ class Node:
                     s.connect(self.node_list[value],8008)
                     s.send(b"SEARCH FILE_SIZE")
                     s.send("{}".format(id))
-                    s.send("{}".format(hash))
                     s.send("{}".format(root))
                     data=s.recv(1024)
                     return data         
 
     def get_size_file(self,root):
+        
         file_id=self.files_hash.get(root)
         
         hash_code = file_id
@@ -291,12 +289,8 @@ class Node:
             id+=hash_code[0]
             hash_code=hash_code[1:len(hash_code)-1]
         hash_code=hash_code[1:len(hash_code)-1]
-        
-        cut_root=root
-        while cut_root[len(cut_root)-1]!="/":
-               cut_root=cut_root[0:len(cut_root)-1]
 
-        return self.find_file(hash_code, None, id, Search_Type.FILE_SIZE,cut_root)
+        return self.find_file(None, None, id, Search_Type.FILE_SIZE,root)
 
     def download_file(root,self):
         
@@ -676,15 +670,12 @@ class Node:
                 self.files_hash.setdefault(root,new_hash)
                 conn.close()
             elif data=="SIZE":
-                id=conn.recv(1024).decode('utf-8')
-                hash=conn.recv(1024).decode('utf-8')
                 root=conn.recv(1024).decode('utf-8')
-                conn.send(os.path.getsize(os.getcwd()+root+id+","+hash))
+                conn.send(os.path.getsize(os.getcwd()+root))
             elif data=="SEARCH FILE_SIZE":
                 id=conn.recv(1024).decode('utf-8')
-                hash=conn.recv(1024).decode('utf-8')
                 root=conn.recv(1024).decode('utf-8')
-                conn.send(self.find_file(hash,None,id,Search_Type.FILE_SIZE,root))
+                conn.send(self.find_file(None,None,id,Search_Type.FILE_SIZE,root))
 
         conn.close()
 
@@ -747,8 +738,11 @@ class Node:
                 file_list[i] = file_list[i].replace("F~~", '')
                 try:
                     os.stat(path + file_list[i])
-                    self.files_hash.setdefault(path+file_list[i],)
-                    self.__files.append
+                    root=path + file_list[i]
+                    with open(root, 'rb') as file: 
+                      hash=hashlib.sha3_256(file).hexdigest()
+                      self.files_hash.setdefault(path+file_list[i],"0,"+hash)
+                      self.__files.append(hash)
                 except:
                     None
         
@@ -1173,6 +1167,8 @@ class Node:
                                 node_control.append(True)
                                 self.__successor=self.__ip
                                 self.__predecessor=self.__ip
+                                self.create_finger_table()
+
                             break
                         elif self.NoSereLider==True:
                                  self.__ip_boss=="temporal"
