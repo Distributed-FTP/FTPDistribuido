@@ -1077,9 +1077,9 @@ class Node:
               node_control[int(COMMAND.decode('utf-8'))]=False
           elif COMMAND.decode('utf-8')=="Dime si esta":
               COMMAND=conn.recv(1024).decode('utf-8')
-              id=conn.recv(1024).decode('utf-8')
-              if self.__files.count(COMMAND)==1:
+              if list(self.__files_system.keys()).count(COMMAND)==1:
                   conn.send(b"Esta")
+                  conn.send(json.dumps(self.__files_system.get(COMMAND))) 
               else:
                   archivo=self.__files_system[COMMAND][0] ##CargarArchivo
                   with open('/store/'+str(id)+","+archivo,'rb') as file:
@@ -1129,28 +1129,62 @@ class Node:
                        os.stat(root)
                        hash=hashlib.sha3_256(root.encode()).hexdigest()
                        if self.files_hash.get(root)==None:
+                        
                         self.files_hash.setdefault(root,self.__id+","+hash)
                         new_files_keys.append(root)
                         new_files_Values.append(self.__id+","+hash)
                         self.__files.append(hash)
                         self.__files_system.setdefault(hash,[self.__ip])
                        else:
-                         self.__files.append(hash)
+                         
+                         
+                         
                          with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
                               s.connect(self.__successor,8005)
                               s.send(b"Dime si esta")
                               s.send(hash)
                               data=s.recv(1024).decode('utf-8')
-                              if data!="Esta":
+                              if data=="Esta":
+                                 lista=json.loads(s.recv(1024))
+                                 self.__files_system.setdefault(hash,lista)
+                                 data=s.recv(1024)
+                                 if data=="Actualiza":
+                                    os.remove(root)
+                                    hashnew=s.recv(1024)
+                                    self.__files.append(hashnew)
+                                    self.__files_system.setdefault(hashnew,self.__files_system.pop(hash))
+                                    self.__files_system.setdefault(hash,hashnew)
+                                    data=s.recv(1024)
+                                    while data!="":
+                                      with open(root, "wb") as f:
+                                       f.write(data)
+                                       data=s.recv(1024)
+                              else:
                                 s.close()
                                 s.connect(self.__predecessor,8005)
                                 s.send(b"Dime si esta")
                                 s.send(hash)
                                 data=s.recv(1024).decode('utf-8')
-                                if data!="Esta":
-                              else:
-                                replicas=json.loads(s.recv(1024))
-                                if len(replicas)==1
+                                if data=="Esta":
+                                 lista=json.loads(s.recv(1024))
+                                 self.__files_system.setdefault(hash,lista)
+                                 self.__files.append(hash)
+                                 data=s.recv(1024)
+                                 if data=="Actualiza":
+                                    os.remove(root)
+                                    hashnew=s.recv(1024)
+                                    self.__files.remove(hash)
+                                    self.__files.append(hashnew)
+                                    self.__files_system.setdefault(hashnew,self.__files_system.pop(hash))
+                                    self.__files_system.setdefault(hash,hashnew)
+                                    data=s.recv(1024)
+                                    while data!="":
+                                      with open(root, "wb") as f:
+                                       f.write(data)
+                                       data=s.recv(1024)
+                                else:
+                                    self.__files.append(hash)
+                                    self.__files_system.setdefault(hash,[self.__ip])
 
                       except:
                         None
