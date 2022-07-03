@@ -761,23 +761,24 @@ class Node:
                     idNodoParaEnviarPeticion+=1
 
     def processes_request(self):
-      threading.Thread(target=self.countdown(), args=(900)).start()   #Este temporizador es para estabilizar el sistema cada un tiempo determinado
-      threading.Thread(target=self.get_requests_system(), args=()).start()
+     # threading.Thread(target=self.countdown(), args=(900)).start()   #Este temporizador es para estabilizar el sistema cada un tiempo determinado
+    #  threading.Thread(target=self.get_requests_system(), args=()).start()
       
-      while stabilized_system and not self.finish_countdown:
+      #while stabilized_system and not self.finish_countdown:
           
-          if self.__ip==self.__ip_boss:
-              threading.Thread(target=self.get_requests(), args=()).start()
-              threading.Thread(target=self.assign_requests(), args=()).start()    
+         # if self.__ip==self.__ip_boss:
+           #   threading.Thread(target=self.get_requests(), args=()).start()
+        #      threading.Thread(target=self.assign_requests(), args=()).start()    
               
               #request=self.requests[0]
-              if request=="subir":
-                     self.upload_file(request)
-                     self.update_nodes()
-              if request=="descargar":
-                      self.download_file(request)
-              if request=="editar":
-                      self.edit_file(request,request)
+           #   if request=="subir":
+          #           self.upload_file(request)
+          #           self.update_nodes()
+           #   if request=="descargar":
+          #            self.download_file(request)
+          #    if request=="editar":
+           #           self.edit_file(request,request)
+           print("ff")
           
     def get_requests(self):
         server = socket.socket(
