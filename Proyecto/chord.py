@@ -9,6 +9,7 @@ from logging import root
 from multiprocessing.sharedctypes import Value
 import os
 from posixpath import split
+from sqlite3 import connect
 from this import s
 import time
 from uuid import getnode
@@ -747,6 +748,8 @@ class Node:
             self.requests.append(data)
 
     def get_files(self,conn):
+        new_files_keys=[]
+        new_files_Values=[]
         files = ""
         with open(self.path + "/Reports/files.fl", 'rb') as f:
             while True:
@@ -768,15 +771,26 @@ class Node:
                     hash=hashlib.sha3_256(root.encode()).hexdigest()
                     if self.files_hash.get(hash)==None:
                      self.files_hash.setdefault(root,self.__id+","+hash)
-                     conn.send(b"New")   
-                     conn.send(root)
-                     conn.send(self.__id+","+hash)
+                     new_files_keys.append(root)
+                     new_files_Values.append(self.__id+","+hash)
                      self.__files.append(hash)
-                     self.__files_system.setdefault(hash,[])
+                     self.__files_system.setdefault(hash,[self.__ip])
+
                     else:
                         os.remove(root)
                 except:
                     None
+            
+            if len(new_files_keys)>0:
+                for nodo in self.node_list:
+                 if nodo!=self.__ip:
+                      if nodo==self.__ip_boss:
+                            conn.send(b"New")   
+                            conn.send(json.dumps(new_files_keys))
+                            conn.send(json.dumps(new_files_keys))
+                      else:
+
+
         
         
     '''
