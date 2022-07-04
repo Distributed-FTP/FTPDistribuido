@@ -12,7 +12,8 @@ import Pyro4
 @Pyro4.behavior(instance_mode="single")
 class ResultConnection(object):
 
-   def return_orden(o,message,node):  
+    def return_orden(self,message,node): 
+        return "Ok" 
             #if message=="Code #399#":
              #   if self.nodo.__ip==self.nodo.__ip_boss:
               #      self.nodo.NodosEncontrados.append(node.__ip)
