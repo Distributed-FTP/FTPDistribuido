@@ -74,13 +74,14 @@ def run(nodo):
                         nodo.stabilized_system=True
                 elif nodo.__ip_boss==None:
                     nodo.search_to_boss=True
-                    eligeLider(nodo)
+                    threading.Thread(target=eligeLider, args=(nodo)).start()
+                    
                     
                     while True:
                         if nodo.search_to_boss==False:
                             if not nodo.leader_calls:
                                 nodo.__ip_boss=nodo.__ip
-                                #self.__id=0
+                                nodo.__id=0
                                 #self.node_list.append(self.__ip)
                                 #node_control.append(True)
                                 #self.__successor=self.__ip
@@ -136,6 +137,6 @@ if __name__ == '__main__':
     machine_name = socket.gethostname()
     machine_ip = socket.gethostbyname(machine_name)
     node=Node(machine_ip,os.getcwd())
-    node.run(node)
+    run(node)
 
  
