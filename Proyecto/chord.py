@@ -11,32 +11,11 @@ import Pyro4
 @Pyro4.expose
 @Pyro4.behavior(instance_mode="single")
 class ResultConnection(object):
-           
-   def return_orden(self,message,node):  
-            if message=="Code #399#":
-                if self.nodo.__ip==self.nodo.__ip_boss:
-                    self.nodo.NodosEncontrados.append(node.__ip)
-                    self.nodo.NodosEncontrados.extend(node.NodosEncontrados)
-                    return 'Code #400#'
+    
+  def add(self, a, b):
+        return a + b
 
-                elif self.nodo.__ip_boss==None:
-                    node.NodosEncontrados.append(self.nodo.__ip)
-                    node.NodosEncontrados.extend(self.nodo.NodosEncontrados)
-                    node.NoSereLider=True
-                    return "Nodo aislado"
-                
-                else:
-                     uri = 'PYRO:Stabilize@'+node.__ip_boss+':8003'
-                     remote = Pyro4.Proxy(uri)
-                     return remote.return_orden("Code #398#",node)
-                     
-            elif message=="Code #398#":
-                    if self.nodo.__ip==self.nodo.__ip_boss:
-                               set(self.nodo.NodosEncontrados.extend(node.NodosEncontrados))
-                               set(self.nodo.NodosEncontrados.append(node.__ip))
-
-                    return 'Code #400#'
-
+@Pyro4.expose
 class Node:
     def __init__(self, ip, path):
         self.id=0
@@ -58,16 +37,15 @@ class Node:
         self.files_hash=dict()
         self.path=path
 
-def eligeLider():
-    threading.Thread(target=get_signal, args=()).start()
-    threading.Thread(target=search_boss, args=()).start()
+    
 
 def run():  
         while True:
             if not nodo.stabilized_system:
                 if nodo.ip_boss == False:
                     nodo.search_to_boss=True
-                    threading.Thread(target=eligeLider,args=()).start()
+                    threading.Thread(target=get_signal, args=()).start()
+                    threading.Thread(target=search_boss, args=()).start()
                     
                     
                     while True:
@@ -102,7 +80,7 @@ def get_signal():
             ResultConnection: "Stabilize"
         },
         host=nodo.ip,
-        port=8003,
+        port=8002,
         ns=False
     )                     
 
@@ -119,7 +97,7 @@ def search_boss():
                 if nodo.ip!= ip+str(i) and nodo.NodosEncontrados.count(ip+str(i))==0:  
                   try:
                     remote = Pyro4.Proxy(uri)
-                    data=remote.return_orden("Code #399#",nodo,None)
+                    data=remote.add(2,3)
                     if data=="Code #400#":
                         nodo.leader_calls=True
                         i=255
