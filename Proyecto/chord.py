@@ -9,7 +9,6 @@ import Pyro4
    # )
 
 @Pyro4.expose
-@Pyro4.behavior(instance_mode="single")
 class ResultConnection(object):
            
    def return_orden(self,message,node):  
@@ -58,84 +57,79 @@ class Node:
         self.files_hash=dict()
         self.path=path
 
-def eligeLider():
-    threading.Thread(target=get_signal, args=()).start()
-    threading.Thread(target=search_boss, args=()).start()
+def run(node):  
+    while True:
+        if not node.stabilized_system:
+            if node.ip_boss == False:
+                node.search_to_boss=True
+                threading.Thread(target=get_signal, args=(node)).start()
+                threading.Thread(target=search_boss, args=(node)).start()
+                
+                
+                while True:
+                    if node.search_to_boss==False:
+                        if not node.leader_calls:
+                            node.ip_boss=node.ip
+                            node.id=0
+                            #self.node_list.append(self.__ip)
+                            #node_control.append(True)
+                            #self.__successor=self.__ip
+                            #self.__predecessor=self.__ip
+                            #self.create_finger_table()
+                            #self.get_files("Create")
 
-def run():  
-        while True:
-            if not nodo.stabilized_system:
-                if nodo.ip_boss == False:
-                    nodo.search_to_boss=True
-                    threading.Thread(target=eligeLider,args=()).start()
-                    
-                    
-                    while True:
-                        if nodo.search_to_boss==False:
-                            if not nodo.leader_calls:
-                                nodo.ip_boss=nodo.ip
-                                nodo.id=0
-                                #self.node_list.append(self.__ip)
-                                #node_control.append(True)
-                                #self.__successor=self.__ip
-                                #self.__predecessor=self.__ip
-                                #self.create_finger_table()
-                                #self.get_files("Create")
-
-                            break
-                        elif nodo.NoSereLider==True:
-                                 nodo.ip_boss=="temporal"
-                                 nodo.NoSereLider=False
-                                 break
-                elif nodo.ip_boss==nodo.ip:
-                    while True:
-                        continue
-                    if nodo.ip_boss==nodo.__ip:                                               
-                        nodo.stabilize()
-                        nodo.update_finger_tables()
-                        nodo.stabilized_system=True
+                        break
+                    elif node.NoSereLider==True:
+                                node.ip_boss=="temporal"
+                                node.NoSereLider=False
+                                break
+            elif node.ip_boss==node.ip:
+                while True:
+                    continue
+                if node.ip_boss==node.__ip:                                               
+                    node.stabilize()
+                    node.update_finger_tables()
+                    node.stabilized_system=True
                                 
-def get_signal():
-             
+def get_signal(node):
         Pyro4.Daemon.serveSimple(
         {
             ResultConnection: "Stabilize"
         },
-        host=nodo.ip,
+        host=node.ip,
         port=8003,
         ns=False
     )                     
 
-def search_boss():
-        ip=nodo.ip
-        while ip[len(ip)-1]!='.':
-            ip=ip[0:len(ip)-1]
-    
-        for i in range(253,254):
-                uri = "PYRO:Stabilize@"+ip+str(i)+":8003"
-                if nodo.NoSereLider==True:
-                    nodo.search_to_boss=False
-                    break
-                if nodo.ip!= ip+str(i) and nodo.NodosEncontrados.count(ip+str(i))==0:  
-                  try:
+def search_boss(node):
+    ip=node.ip
+    while ip[len(ip)-1]!='.':
+        ip=ip[0:len(ip)-1]
+
+    for i in range(61,63):
+            uri = "PYRO:Stabilize@"+ip+str(i)+":8002"
+            if node.NoSereLider==True:
+                node.search_to_boss=False
+                break
+            if node.ip!= ip+str(i) and node.NodosEncontrados.count(ip+str(i))==0:  
+                try:
                     remote = Pyro4.Proxy(uri)
-                    data=remote.return_orden("Code #399#",nodo,None)
+                    data=remote.return_orden("Code #399#",node,None)
                     if data=="Code #400#":
-                        nodo.leader_calls=True
+                        node.leader_calls=True
                         i=255
                     elif data=="Nodo aislado":
-                         print("")
-                         #   continue
-                    
-                  except:
-                     print("continue")
+                            print("")
+                            #   continue
+                
+                except:
+                    print("continue")
+    
         
-            
-                nodo.search_to_boss=False  
+            node.search_to_boss=False  
 
 machine_name = socket.gethostname()
 machine_ip = socket.gethostbyname(machine_name)
-nodo=Node(machine_ip,os.getcwd())
-run()
+run(Node(machine_ip,os.getcwd()))
 
  
