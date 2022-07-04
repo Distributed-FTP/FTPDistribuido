@@ -20,7 +20,7 @@ class Listen(object):
     def update_fingetables():
         for i in range(0,8):
             id=pow(2,i)+node.id
-            node.finger_table[id]=node.sucesor(id)
+            node.finger_table[id]=node.give_me_sucesor(id)
 
     def leave(id):
        node.node_control[id]=False
@@ -80,7 +80,7 @@ class Node:
             key=self.id+pow(2,i)
             self.finger_table.setdefault(key,key)
 
-    def successor(self, id):
+    def give_me_sucesor(self, id):
       pos=id+1
       if pos>=len(self.node_list):
           pos=0
