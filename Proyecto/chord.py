@@ -39,14 +39,14 @@ class ResultConnection(object):
 
 class Node:
     def __init__(self, ip, path):
-        self.__id=0
-        self.__ip=ip
-        self.__files=list()  #se guardaran los archivos que esten almacenados en este nodo , mas alla que sea una replica . 
-        self.__files_system=dict()  #Aqui se guardara el hash del archivo y en que otros nodos esta
-        self.__predecessor=None
-        self.__successor=None
+        self.id=0
+        self.ip=ip
+        self.files=list()  #se guardaran los archivos que esten almacenados en este nodo , mas alla que sea una replica . 
+        self.files_system=dict()  #Aqui se guardara el hash del archivo y en que otros nodos esta
+        self.predecessor=None
+        self.successor=None
         self.finger_table=dict()
-        self.__ip_boss=None
+        self.ip_boss=False
         self.there_boss=False
         self.node_list=[]
         self.requests=[]  # aqui se guardan las requests de los clientes
@@ -58,21 +58,14 @@ class Node:
         self.files_hash=dict()
         self.path=path
 
-def eligeLider():
-    threading.Thread(target=get_signal, args=()).start()
-    threading.Thread(target=search_boss, args=()).start()
+def eligeLider(nodo):
+    threading.Thread(target=get_signal, args=(nodo)).start()
+    threading.Thread(target=search_boss, args=(nodo)).start()
 
 def run(nodo):  
         while True:
             if not nodo.stabilized_system:
-                if nodo.__ip_boss==nodo.__ip:
-                    while True:
-                        continue
-                    if nodo.__ip_boss==nodo.__ip:                                               
-                        nodo.stabilize()
-                        nodo.update_finger_tables()
-                        nodo.stabilized_system=True
-                elif nodo.__ip_boss==None:
+                if nodo.ip_boss == False:
                     nodo.search_to_boss=True
                     threading.Thread(target=eligeLider, args=(nodo)).start()
                     
@@ -80,8 +73,8 @@ def run(nodo):
                     while True:
                         if nodo.search_to_boss==False:
                             if not nodo.leader_calls:
-                                nodo.__ip_boss=nodo.__ip
-                                nodo.__id=0
+                                nodo.ip_boss=nodo.ip
+                                nodo.id=0
                                 #self.node_list.append(self.__ip)
                                 #node_control.append(True)
                                 #self.__successor=self.__ip
@@ -91,9 +84,16 @@ def run(nodo):
 
                             break
                         elif nodo.NoSereLider==True:
-                                 nodo.__ip_boss=="temporal"
+                                 nodo.ip_boss=="temporal"
                                  nodo.NoSereLider=False
                                  break
+                elif nodo.ip_boss==nodo.ip:
+                    while True:
+                        continue
+                    if nodo.ip_boss==nodo.__ip:                                               
+                        nodo.stabilize()
+                        nodo.update_finger_tables()
+                        nodo.stabilized_system=True
                                 
 def get_signal(self):
              
