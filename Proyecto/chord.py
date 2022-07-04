@@ -118,7 +118,6 @@ def search_boss(self):
                 if self.__ip!= ip+str(i) and self.NodosEncontrados.count(ip+str(i))==0:  
                   try:
                     remote = Pyro4.Proxy(uri)
-                    remote._pyroBind()
                     data=remote.return_orden("Code #399#",self,None)
                     if data=="Code #400#":
                         self.leader_calls=True
@@ -137,6 +136,6 @@ if __name__ == '__main__':
     machine_name = socket.gethostname()
     machine_ip = socket.gethostbyname(machine_name)
     node=Node(machine_ip,os.getcwd())
-    node.run()
+    node.run(node)
 
  
