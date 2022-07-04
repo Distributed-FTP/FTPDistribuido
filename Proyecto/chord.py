@@ -12,30 +12,31 @@ import Pyro4
 @Pyro4.behavior(instance_mode="single")
 class ResultConnection(object):
 
-   def return_orden(self,message,node):  
-            if message=="Code #399#":
-                if self.nodo.__ip==self.nodo.__ip_boss:
-                    self.nodo.NodosEncontrados.append(node.__ip)
-                    self.nodo.NodosEncontrados.extend(node.NodosEncontrados)
-                    return 'Code #400#'
+   def return_orden(o,message,node):  
+            #if message=="Code #399#":
+             #   if self.nodo.__ip==self.nodo.__ip_boss:
+              #      self.nodo.NodosEncontrados.append(node.__ip)
+               #     self.nodo.NodosEncontrados.extend(node.NodosEncontrados)
+                #    return 'Code #400#'
 
-                elif self.nodo.__ip_boss==None:
-                    node.NodosEncontrados.append(self.nodo.__ip)
-                    node.NodosEncontrados.extend(self.nodo.NodosEncontrados)
-                    node.NoSereLider=True
-                    return "Nodo aislado"
+               # elif self.nodo.__ip_boss==None:
+                #    node.NodosEncontrados.append(self.nodo.__ip)
+                 #   node.NodosEncontrados.extend(self.nodo.NodosEncontrados)
+                 #   node.NoSereLider=True
+                 #   return "Nodo aislado"
                 
-                else:
-                     uri = 'PYRO:Stabilize@'+node.__ip_boss+':8003'
-                     remote = Pyro4.Proxy(uri)
-                     return remote.return_orden("Code #398#",node)
+               # else:
+                #     uri = 'PYRO:Stabilize@'+node.__ip_boss+':8003'
+                 #    remote = Pyro4.Proxy(uri)
+                 #    return remote.return_orden("Code #398#",node)
                      
-            elif message=="Code #398#":
-                    if self.nodo.__ip==self.nodo.__ip_boss:
-                               set(self.nodo.NodosEncontrados.extend(node.NodosEncontrados))
-                               set(self.nodo.NodosEncontrados.append(node.__ip))
+           # elif message=="Code #398#":
+            #        if self.nodo.__ip==self.nodo.__ip_boss:
+             #                  set(self.nodo.NodosEncontrados.extend(node.NodosEncontrados))
+              #                 set(self.nodo.NodosEncontrados.append(node.__ip))
 
-                    return 'Code #400#'
+               #     return 'Code #400#'
+               print("Entro")
 
 @Pyro4.expose
 class Node:
@@ -85,7 +86,7 @@ def run():
                                 node.ip_boss=="temporal"
                                 node.NoSereLider=False
                                 break
-                        elif node.ip_boss==node.ip:
+                elif node.ip_boss==node.ip:
                           while True:
                            continue
                           if node.ip_boss==node.__ip:                                               
