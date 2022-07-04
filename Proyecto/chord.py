@@ -22,7 +22,7 @@ class Listen(object):
             id=pow(2,i)+node.id
             node.finger_table[id]=node.give_me_sucesor(id)
 
-    def leave(id):
+    def leave_message(id):
        node.node_control[id]=False
 
     def ping():
@@ -87,9 +87,6 @@ class Node:
       while self.node_control[pos]!=True and pos!=id:
           pos+=1
       return pos
-
-
-
 
 def create_finger_table():
         for i in range(8):
@@ -203,25 +200,36 @@ def update_fingertables_boss():
                 return False
 
 def stabilize():
+        first_node_active=Node
         for nodo in node.node_list:
             if nodo != node.ip:
                  try: 
                    uri = "PYRO:Stabilize@"+nodo+":8003"
                    remote = Pyro4.Proxy(uri)
                    remote.ping()
+                   
                    if not node.node_control[node.node_list.index(nodo)]:
                           join(nodo)
                           if node.NodosEncontrados.count(nodo)!=0:
                                 node.NodosEncontrados.remove(nodo)
-
+                   if first_node_active!=None:
+                      first_node_active=nodo   
+                
                  except:
                     if node.node_control[node.node_list.index(nodo)]==True:
                         leave(node.node_list.index(nodo))
                     continue
 
+            else:
+                if first_node_active!=None:
+                    first_node_active=nodo 
+
+
         for nodo in node.NodosEncontrados:
             join(nodo)
-        
+
+        #Hay que actualizar el predecesor del primer nodo
+
         node.NodosEncontrados=[]
 
 def leave(id):
@@ -231,76 +239,72 @@ def leave(id):
         update_successor(ip_predecessor,ip_successor)
         update_predecessor(ip_successor,ip_predecessor)
         
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            for nodo in self.node_list:
-                if nodo!=self.node_list[id]:
-                    if node_control[id]==True:             
+        for nodo in node.node_list:
+                if nodo != node.node_list[id] and nodo != node.ip:
+                    if node.node_control[id]==True:             
                         try:
-                            s.connect(nodo,8005)
-                            s.send(b"LEAVE")
-                            s.send(b"{}".__format__(str(id)))
-                            s.close()
+                            uri = "PYRO:Stabilize@"+nodo+":8005"
+                            remote = Pyro4.Proxy(uri)
+                            remote.leave_message(id)
                         except:
                             print("Otro nodo salio del sistema ,se vera cuando lleguemos a el")
 
-def join(self,ip):
+def join(ip):
         soyNuevo=True
-        if not self.node_list.count(ip)==1:   #Te estas reconectando           
-            node_control[self.node_list.index(ip)]=True
+        if node.node_list.count(ip)==1:   #Te estas reconectando           
+            node.node_control[node.node_list.index(ip)]=True
             soyNuevo=False
         else:
-            node_control.append(True)
-            self.node_list.append(ip)
-        sucesor=self.get_successor(ip)
-        predecesor=self.get_predecessor(ip)
-        self.update_successor(ip,sucesor)
-        self.update_predecessor(ip,predecesor)
-        self.update_successor(predecesor,ip)
-        self.update_predecessor(sucesor,ip)
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            for nodo in self.node_list:            
-                if node_control[self.node_list.index(nodo)]:
-                    try:
-                        s.connect(nodo,8005)
-                        s.send(b"JOIN")
-                        send_list=json.dumps(node_control)
-                        s.send(b"{}".__format__(send_list.encode('utf-8')))
-                        send_list=json.dumps(self.node_list)
-                        s.send(b"{}".__format__(send_list.encode('utf-8')))
-                        if soyNuevo:
-                            s.send(b"{}".__format__(str(self.node_list.index(ip)).encode('utf-8')))
-                        else:
-                            s.send(b"")
-                        if nodo==ip:
-                            send_list=json.dumps(list(self.files_hash.keys()))
-                            s.send(b"{}".__format__(send_list))
-                            send_list=json.dumps(list(self.files_hash.values()))
-                            s.send(b"{}".__format__(send_list))
+            node.node_control.append(True)
+            node.node_list.append(ip)
+        sucesor=get_successor(ip)
+        predecesor=get_predecessor(ip)
+        update_successor(ip,sucesor)
+        update_predecessor(ip,predecesor)
+        update_successor(predecesor,ip)
+        update_predecessor(sucesor,ip)
+        
+        #with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+         #   for nodo in self.node_list:            
+          #     if node_control[self.node_list.index(nodo)]:
+           #         try:
+           #             s.connect(nodo,8005)
+            #            s.send(b"JOIN")
+             #           send_list=json.dumps(node_control)
+              #          s.send(b"{}".__format__(send_list.encode('utf-8')))
+               #         send_list=json.dumps(self.node_list)
+                #        s.send(b"{}".__format__(send_list.encode('utf-8')))
+                 #       if soyNuevo:
+                 #           s.send(b"{}".__format__(str(self.node_list.index(ip)).encode('utf-8')))
+                 #       else:
+                 ##           s.send(b"")
+                  #      if nodo==ip:
+                 #           send_list=json.dumps(list(self.files_hash.keys()))
+                 #           s.send(b"{}".__format__(send_list))
+                 #           send_list=json.dumps(list(self.files_hash.values()))
+                #            s.send(b"{}".__format__(send_list))
+#
+ #                           if not soyNuevo:
+  #                           s.send(b"Reconectando")
+   #                          
+#
+ #                           else:
+  #                           s.send(b"Continue")
+   #                         data=s.recv(1024)
+    #                        while data != "":
+     #                           data=s.recv(1024)
+      #                          keys=json.loads(data)
+       #                         data=s.recv(1024)
+         #                       values=json.loads(data)
+         #                       for i in range(0,len(keys)-1):
+          #                         self.files_hash.setdefault(keys[i],values[i])           
+           #                     data=s.recv(1024)
+            #            else:
+             #               s.send(b"")
 
-                            if not soyNuevo:
-                             s.send(b"Reconectando")
-                             
-
-                            else:
-                             s.send(b"Continue")
-                            data=s.recv(1024)
-                            while data != "":
-                                data=s.recv(1024)
-                                keys=json.loads(data)
-                                data=s.recv(1024)
-                                values=json.loads(data)
-                                for i in range(0,len(keys)-1):
-                                   self.files_hash.setdefault(keys[i],values[i])           
-                                data=s.recv(1024)
-                        else:
-                            s.send(b"")
-
-                        
-                        
-
-                        s.close()
-                    except:
-                        print("Otro nodo entro en el sistema ,se vera cuando lleguemos a el")
+              #          s.close()
+               #     except:
+                #        print("Otro nodo entro en el sistema ,se vera cuando lleguemos a el")
 
 def get_predecessor(ip):
         pos=node.node_list.index(ip)
@@ -332,7 +336,7 @@ def update_successor(ip,new_successor):
        try:
         uri = "PYRO:Stabilize@"+ip+":8005"
         remote = Pyro4.Proxy(uri)
-        remote.update_predecesor(new_successor)
+        remote.update_update_sucesor(new_successor)
        except:
         print("El nodo se desconecto del sistema")
              
