@@ -58,16 +58,16 @@ class Node:
         self.files_hash=dict()
         self.path=path
 
-def eligeLider(nodo):
-    threading.Thread(target=get_signal, args=(nodo)).start()
-    threading.Thread(target=search_boss, args=(nodo)).start()
+def eligeLider():
+    threading.Thread(target=get_signal, args=()).start()
+    threading.Thread(target=search_boss, args=()).start()
 
-def run(nodo):  
+def run():  
         while True:
             if not nodo.stabilized_system:
                 if nodo.ip_boss == False:
                     nodo.search_to_boss=True
-                    threading.Thread(target=eligeLider, args=(nodo)).start()
+                    threading.Thread(target=eligeLider,args=()).start()
                     
                     
                     while True:
@@ -95,33 +95,33 @@ def run(nodo):
                         nodo.update_finger_tables()
                         nodo.stabilized_system=True
                                 
-def get_signal(self):
+def get_signal():
              
         Pyro4.Daemon.serveSimple(
         {
             ResultConnection: "Stabilize"
         },
-        host=self.__ip,
+        host=nodo.ip,
         port=8003,
         ns=False
     )                     
 
-def search_boss(self):
-        ip=self.__ip
+def search_boss():
+        ip=nodo.ip
         while ip[len(ip)-1]!='.':
             ip=ip[0:len(ip)-1]
     
         for i in range(253,254):
                 uri = "PYRO:Stabilize@"+ip+str(i)+":8003"
-                if self.NoSereLider==True:
-                    self.search_to_boss=False
+                if nodo.NoSereLider==True:
+                    nodo.search_to_boss=False
                     break
-                if self.__ip!= ip+str(i) and self.NodosEncontrados.count(ip+str(i))==0:  
+                if nodo.ip!= ip+str(i) and nodo.NodosEncontrados.count(ip+str(i))==0:  
                   try:
                     remote = Pyro4.Proxy(uri)
-                    data=remote.return_orden("Code #399#",self,None)
+                    data=remote.return_orden("Code #399#",nodo,None)
                     if data=="Code #400#":
-                        self.leader_calls=True
+                        nodo.leader_calls=True
                         i=255
                     elif data=="Nodo aislado":
                          print("")
@@ -131,12 +131,11 @@ def search_boss(self):
                      print("continue")
         
             
-                self.search_to_boss=False  
+                nodo.search_to_boss=False  
 
-if __name__ == '__main__':
-    machine_name = socket.gethostname()
-    machine_ip = socket.gethostbyname(machine_name)
-    node=Node(machine_ip,os.getcwd())
-    run(node)
+machine_name = socket.gethostname()
+machine_ip = socket.gethostbyname(machine_name)
+nodo=Node(machine_ip,os.getcwd())
+run()
 
  
