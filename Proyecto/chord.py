@@ -40,6 +40,7 @@ class ResultConnection(object):
 
                     return 'Code #400#'
 
+@Pyro4.expose
 class Node:
     def __init__(self, ip, path):
         self.__id=0
@@ -98,7 +99,7 @@ class Node:
              
         Pyro4.Daemon.serveSimple(
         {
-            ResultConnection(self): "Stabilize"
+            ResultConnection: "Stabilize"
         },
         host=self.__ip,
         port=8003,
