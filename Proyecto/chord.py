@@ -37,7 +37,6 @@ class ResultConnection(object):
               #                 set(self.nodo.NodosEncontrados.append(node.__ip))
 
                #     return 'Code #400#'
-               print("Entro")
 
 @Pyro4.expose
 class Node:
