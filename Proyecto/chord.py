@@ -66,7 +66,7 @@ def run():
                 if node.ip_boss == False:
                     node.search_to_boss=True
                     threading.Thread(target=get_signal, args=()).start()
-                    threading.Thread(target=search_boss, args=()).start()
+                    #threading.Thread(target=search_boss, args=()).start()
                     
                     
                     while True:
@@ -82,17 +82,17 @@ def run():
                                 #self.get_files("Create")
 
                             break
-                        elif node.NoSereLider==True:
-                                node.ip_boss=="temporal"
-                                node.NoSereLider=False
-                                break
-                elif node.ip_boss==node.ip:
-                          while True:
-                           continue
-                          if node.ip_boss==node.__ip:                                               
-                           node.stabilize()
-                           node.update_finger_tables()
-                           node.stabilized_system=True
+                        #elif node.NoSereLider==True:
+                         #       node.ip_boss=="temporal"
+                          #      node.NoSereLider=False
+                           #     break
+               # elif node.ip_boss==node.ip:
+                #          while True:
+                 #          continue
+                      #    if node.ip_boss==node.__ip:                                               
+                       #    node.stabilize()
+                        #   node.update_finger_tables()
+                         #  node.stabilized_system=True
                                 
 def get_signal():
 
