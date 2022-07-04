@@ -8,6 +8,26 @@ import Pyro4
   #      ns=False
    # )
 
+
+@Pyro4.expose
+class Listen(object):
+    def update_predecesor(predecesor):
+        node.predecessor=predecesor
+
+    def update_sucesor(sucesor):
+        node.successor=sucesor
+
+    def update_fingetables():
+        for i in range(0,8):
+            id=pow(2,i)+node.id
+            node.finger_table[id]=node.sucesor(id)
+
+    def leave(id):
+       node.node_control[id]=False
+
+    
+
+
 @Pyro4.expose
 class ResultConnection(object):
   
@@ -60,6 +80,14 @@ class Node:
             key=self.id+pow(2,i)
             self.finger_table.setdefault(key,key)
 
+    def successor(self, id):
+      pos=id+1
+      if pos>=len(self.node_list):
+          pos=0
+      while self.node_control[pos]!=True and pos!=id:
+          pos+=1
+      return pos
+
 
 def run():  
         while True:
@@ -87,12 +115,17 @@ def run():
                                 node.NoSereLider=False
                                 break
                 elif node.ip_boss==node.ip:
-                          while True:
-                           continue
-                          if node.ip_boss==node.__ip:                                               
+                         
+                          if node.ip_boss==node.ip:                                               
                            node.stabilize()
                            node.update_finger_tables()
                            node.stabilized_system=True
+                #elif not check_ping(self.__ip_boss):
+                 #   self.there_boss=False
+                  #  threading.Thread(target=self.wait_update_boss, args=()).start()
+                   # threading.Thread(target=self.get_boss, args=()).start()
+                else:
+                     listen()
                                 
 def get_signal():
 
@@ -105,6 +138,18 @@ def get_signal():
         port=8003,
         ns=False
     )                     
+
+def listen():
+
+        Pyro4.Daemon.serveSimple(
+        {
+            Listen: "Stabilize"
+        },
+
+        host=node.ip,
+        port=8005,
+        ns=False
+    )             
 
 def search_boss():
     ip=node.ip
@@ -141,5 +186,3 @@ machine_name = socket.gethostname()
 machine_ip = socket.gethostbyname(machine_name)
 node=Node(machine_ip,os.getcwd())
 run()
-
- 
