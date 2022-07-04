@@ -9,34 +9,10 @@ import Pyro4
    # )
 
 @Pyro4.expose
-@Pyro4.behavior(instance_mode="single")
 class ResultConnection(object):
-
-    def return_orden(self,message,node): 
-        return "Ok" 
-            #if message=="Code #399#":
-             #   if self.nodo.__ip==self.nodo.__ip_boss:
-              #      self.nodo.NodosEncontrados.append(node.__ip)
-               #     self.nodo.NodosEncontrados.extend(node.NodosEncontrados)
-                #    return 'Code #400#'
-
-               # elif self.nodo.__ip_boss==None:
-                #    node.NodosEncontrados.append(self.nodo.__ip)
-                 #   node.NodosEncontrados.extend(self.nodo.NodosEncontrados)
-                 #   node.NoSereLider=True
-                 #   return "Nodo aislado"
-                
-               # else:
-                #     uri = 'PYRO:Stabilize@'+node.__ip_boss+':8003'
-                 #    remote = Pyro4.Proxy(uri)
-                 #    return remote.return_orden("Code #398#",node)
-                     
-           # elif message=="Code #398#":
-            #        if self.nodo.__ip==self.nodo.__ip_boss:
-             #                  set(self.nodo.NodosEncontrados.extend(node.NodosEncontrados))
-              #                 set(self.nodo.NodosEncontrados.append(node.__ip))
-
-               #     return 'Code #400#'
+    
+  def add(self, a, b):
+        return a + b
 
 @Pyro4.expose
 class Node:
@@ -66,7 +42,7 @@ def run():
                 if node.ip_boss == False:
                     node.search_to_boss=True
                     threading.Thread(target=get_signal, args=()).start()
-                    #threading.Thread(target=search_boss, args=()).start()
+                    threading.Thread(target=search_boss, args=()).start()
                     
                     
                     while True:
@@ -82,27 +58,27 @@ def run():
                                 #self.get_files("Create")
 
                             break
-                        #elif node.NoSereLider==True:
-                         #       node.ip_boss=="temporal"
-                          #      node.NoSereLider=False
-                           #     break
-               # elif node.ip_boss==node.ip:
-                #          while True:
-                 #          continue
-                      #    if node.ip_boss==node.__ip:                                               
-                       #    node.stabilize()
-                        #   node.update_finger_tables()
-                         #  node.stabilized_system=True
+                        elif node.NoSereLider==True:
+                                node.ip_boss=="temporal"
+                                node.NoSereLider=False
+                                break
+                        elif node.ip_boss==node.ip:
+                          while True:
+                           continue
+                          if node.ip_boss==node.__ip:                                               
+                           node.stabilize()
+                           node.update_finger_tables()
+                           node.stabilized_system=True
                                 
 def get_signal():
 
         Pyro4.Daemon.serveSimple(
         {
-            ResultConnection: "Chord"
+            ResultConnection: "Stabilize"
         },
 
         host=node.ip,
-        port=8003,
+        port=8002,
         ns=False
     )                     
 
@@ -111,15 +87,17 @@ def search_boss():
     while ip[len(ip)-1]!='.':
         ip=ip[0:len(ip)-1]
 
-    for i in range(100,101):
-            uri = "PYRO:Chord@"+ip+str(i)+":8003"
+    for i in range(61,63):
+            uri = "PYRO:Stabilize@"+ip+str(i)+":8002"
             if node.NoSereLider==True:
                 node.search_to_boss=False
                 break
             if node.ip!= ip+str(i) and node.NodosEncontrados.count(ip+str(i))==0:  
                 try:
                     remote = Pyro4.Proxy(uri)
-                    data=remote.return_orden("Code #399#",node,"")
+
+                    data=remote.add(2,3)
+
                     if data=="Code #400#":
                         node.leader_calls=True
                         i=255
@@ -129,7 +107,6 @@ def search_boss():
                 
                 except:
                     print("continue")
-                    continue
     
         
             node.search_to_boss=False  
