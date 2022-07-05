@@ -5,6 +5,8 @@ import threading
 import Pyro4
 import time
 
+from utils import get_proxy
+
 @Pyro4.expose
 class Listen(object):
     def update_predecesor(predecesor):
@@ -86,6 +88,92 @@ class Node:
         self.files_hash=dict()
         self.path=path
         self.node_control=[]
+
+    '''
+        Properties
+    '''
+    @property
+    def create_directory_property(self, name:str):
+        os.mkdir(name)
+    
+    @property
+    def delete_directory_property(self, name:str):
+        os.rmdir(name)
+        
+    @property
+    def rename_directory_property(self, name:str, new_name:str):
+        os.rename(name, new_name)
+    
+    @property
+    def state_directory_property(self, name:str):
+        return os.stat(name)
+    
+    @property
+    def delete_file_property(self, name:str):
+        os.remove(name)
+        
+    @property
+    def get_size_file_property(self,root):
+        return self.get_size_file(root)
+    
+    @property
+    def rename_file_property(self, name:str, new_name:str):
+        os.rename(name, new_name)
+    
+    @property
+    def state_file_property(self, name:str):
+        return os.stat(name)
+    
+    @property
+    def id(self):
+        return self.__id
+    
+    @property
+    def successor(self):
+        return self.__successor
+    
+    @property
+    def predecessor(self):
+        return self.__predecessor
+    
+    '''
+        Actions
+    '''
+    def create_directory(self,name:str):
+        self.create_directory_property(name)
+        for nodo in self.node_list:
+            if nodo!=self.__ip:
+                if self.node_control[self.node_list.index(nodo)]==True:
+                    node = get_proxy(nodo)
+                    try:
+                          node.create_directory_property(name)
+                    except:
+                        stabilized_system=False
+
+    def changeName_directory(self,name,new_name):
+        self.rename_directory_property(name)
+        for nodo in self.node_list:
+            if nodo!=self.__ip:
+                if self.node_control[self.node_list.index(nodo)]==True:
+                    node = get_proxy(nodo)
+                    try:
+                          node.rename_directory_property(name)
+                    except:
+                        stabilized_system=False
+         
+    def delete_directory(self,name):
+        self.delete_directory_property(name)
+        for nodo in self.node_list:
+            if nodo!=self.__ip:
+                if self.node_control[self.node_list.index(nodo)]==True:
+                    node = get_proxy(nodo)
+                    try:
+                          node.delete_directory_property(name)
+                    except:
+                        stabilized_system=False
+
+    def state_directory(self,name):
+        return self.state_directory_property(name)
 
     def give_me_sucesor(self, id):
       pos=id+1
