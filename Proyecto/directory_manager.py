@@ -112,7 +112,7 @@ class Directory_Manager():
             file = str(file).replace("D~~", '')
             file = str(file).replace("F~~", '')
             file = str(file).replace("'", '')
-            if file.__contains__(directory_name) and file != directory_name:
+            if len(file.split(directory_name))>1 and len(file.split(directory_name)[1].split("/"))==2 and file != directory_name:
                 list_result.append(self.route_path_default + file)
         return list_result
     
@@ -228,11 +228,6 @@ class Directory_Manager():
         if file_list.__contains__(path):
             return True
         return False
-        
-    def get_file_size(self, file_name: str):
-        uri = "PYRO:FilesManager@"+self.__ip+":8011"
-        remote = Pyro4.Proxy(uri)
-        return remote.get_size(self.path_default + self.route_path + file_name)
      
    
     #All
