@@ -11,11 +11,11 @@ import hashlib
 from datetime import datetime
 from Accessories.search_type import Search_Type
 
-Pyro4.expose
+@Pyro4.expose
 class UpdateDirectoriesManager(object):
-  
     def create_directory(self,root):
-        os.mkdir(root)
+        print("Creating directory: " + root)
+        os.mkdir(os.path.basename() + root)
 
     def change_name_directory(self,root,new_name):
         os.rename(root,new_name)
@@ -23,8 +23,8 @@ class UpdateDirectoriesManager(object):
     def delete_directory(self,root):
         os.rmdir(root)
     
-    def update_data_file(self,root,data):
-        with open(root, 'w') as f:
+    def update_data_file(self,data):
+        with open(os.path.dirname() + "/Reports/files.fl", 'w') as f:
             f.write(data)
 
 @Pyro4.expose
@@ -399,13 +399,14 @@ class DirectoriesManager(object):
             f.write(db_data)
         for nodo in node.node_list:
             if node.node_control[node.node_list.index(nodo)] and node.ip!=nodo:
-                try:
-                    uri = "PYRO:UpdateDirectoriesManager@"+nodo+":8012"
-                    remote = Pyro4.Proxy(uri)
-                    remote.create_directory(name)
-                    remote.update_data_file(db_root, db_data)
-                except:
-                    None
+                uri = "PYRO:UpdateDirectoriesManager@"+nodo+":8012"
+                print(uri)
+                remote = Pyro4.Proxy(uri)
+                list_name = name.split('/root/')
+                remote.create_directory("/root/"+list_name[1])
+                print("Directorio creado en "+nodo)
+                remote.update_data_file(db_data)
+                print("Directorio actualizado en "+nodo)
 
     def change_name_directory(self, name:str, new_name:str, db_root:str, db_data:str):
         os.rename(name, new_name)
@@ -417,7 +418,7 @@ class DirectoriesManager(object):
                     uri = "PYRO:UpdateDirectoriesManager@"+nodo+":8012"
                     remote = Pyro4.Proxy(uri)
                     remote.change_name_directory(name,new_name)
-                    remote.update_data_file(db_root, db_data)
+                    remote.update_data_file(db_data)
                 except:
                     None
          
@@ -431,7 +432,7 @@ class DirectoriesManager(object):
                     uri = "PYRO:UpdateDirectoriesManager@"+nodo+":8012"
                     remote = Pyro4.Proxy(uri)
                     remote.delete_directory(name)
-                    remote.update_data_file(db_root, db_data)
+                    remote.update_data_file(db_data)
                 except:
                     None
 
