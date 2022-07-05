@@ -772,7 +772,7 @@ def wait_update_boss():
     port=8002,
     ns=False)  
         
-def createServer():
+def createServerDM():
     Pyro4.Daemon.serveSimple(
     {
        DirectoriesManager : "DirectoriesManager"
@@ -781,6 +781,7 @@ def createServer():
     port=8010,
     ns=False)
 
+def createServerFM():
     Pyro4.Daemon.serveSimple(
     {
        FilesManager : "FilesManager"
@@ -789,6 +790,7 @@ def createServer():
     port=8011,
     ns=False)
 
+def createServerUDM():
     Pyro4.Daemon.serveSimple(
     {
        UpdateDirectoriesManager : "UpdateDirectoriesManager"
@@ -797,6 +799,7 @@ def createServer():
     port=8012,
     ns=False)
 
+def createServerFF():
     Pyro4.Daemon.serveSimple(
     {
        FindFile : "FindFile"
@@ -909,6 +912,10 @@ if __name__ == "__main__":
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     s.connect(("8.8.8.8", 80))
     ip_server = s.getsockname()[0]
+    s.close()
     node=Node(ip_server,os.getcwd())
-    createServer()
+    threading.Thread(target=createServerDM, args=()).start()
+    threading.Thread(target=createServerFM, args=()).start()
+    threading.Thread(target=createServerUDM, args=()).start()
+    threading.Thread(target=createServerFF, args=()).start()
     run()
