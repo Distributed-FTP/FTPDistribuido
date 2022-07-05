@@ -458,17 +458,7 @@ def wait_update_boss():
     port=8002,
     ns=False)  
         
-        #while not node.there_boss:
-        #    conn, addr = self.server.accept() # Establecemos la conexión con el cliente
-         #   if conn:
-         #       data=conn.recv(1024)
-         #       if data.decode('utf-8')=="Soy lider d nodos":
-         #           there_boss=True
-         #           self.__ip_boss=addr[0]
-         #       elif data.decode('utf-8')=="Eres el lider":
-          #          self.__ip_boss=self.__ip
-          #          there_boss=True     
-          #      conn.close()     
+   
      
 s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 s.connect(("8.8.8.8", 80))
