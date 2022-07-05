@@ -69,7 +69,7 @@ class ResultConnection(object):
 @Pyro4.expose
 class Node:
     def __init__(self, ip, path):
-        self.id=0
+        self.id=None
         self.ip=ip
         self.files=list()  #se guardaran los archivos que esten almacenados en este nodo , mas alla que sea una replica . 
         self.files_system=dict()  #Aqui se guardara el hash del archivo y en que otros nodos esta
@@ -124,17 +124,17 @@ class Node:
     def state_file_property(self, name:str):
         return os.stat(name)
     
-    @property
-    def id(self):
-        return self.__id
+    #@property
+    #def id(self):
+    #    return self.__id
     
-    @property
-    def successor(self):
-        return self.__successor
+    #@property
+    #def successor(self):
+    #    return self.__successor
     
-    @property
-    def predecessor(self):
-        return self.__predecessor
+    #@property
+    #def predecessor(self):
+    #    return self.__predecessor
     
     '''
         Actions
@@ -256,7 +256,7 @@ def search_boss():
     while ip[len(ip)-1]!='.':
         ip=ip[0:len(ip)-1]
 
-    for i in range(134,136):
+    for i in range(62,63):
             uri = "PYRO:Stabilize@"+ip+str(i)+":8003"
             if node.NoSereLider==True:
                 node.search_to_boss=False
