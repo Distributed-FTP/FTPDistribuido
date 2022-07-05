@@ -294,7 +294,7 @@ class FilesManager(object):
             count_files=0
             count=0
             for nodo in node.node_list:
-                if node.node_control[node.node_control.index(nodo)]==True and nodo!=node.ip:
+                if node.node_control[node.node_control.index(nodo)] and nodo!=node.ip:
                     try:
                         uri = "PYRO:FindFile@"+nodo+":8013"
                         remote = Pyro4.Proxy(uri)
@@ -309,6 +309,8 @@ class FilesManager(object):
                         stabilized_system=False
                         return False
                     count+=1
+            if ip==None:
+                ip=node.ip
             try:    
                 hash=hashlib.sha256(name+str(datetime.now())).hexdigest()
                 if ip!=node.ip:
