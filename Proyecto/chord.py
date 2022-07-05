@@ -212,7 +212,7 @@ def run():
                         node.NoSereLider=False
                         break
             elif node.ip_boss==node.ip:                                                      
-                countdown(30)
+                countdown(10)
                 stabilize()
                 if not update_fingertables_boss():
                     node.stabilized_system=False
@@ -384,12 +384,12 @@ def join(ip):
 def get_predecessor(ip):
     pos=node.node_list.index(ip)
     if pos==0:
-        pos==len(node.node_list)-1
+        pos=len(node.node_list)-1
     else:
         pos-=1
-    while not node.node_list[pos]:
+    while not node.node_control[pos]:
         if pos==0:
-            pos==len(node.node_list)-1
+            pos=len(node.node_list)-1
         else:
             pos-=1
     return node.node_list[pos]
@@ -397,12 +397,12 @@ def get_predecessor(ip):
 def get_successor(ip):
     pos=node.node_list.index(ip)
     if pos==len(node.node_list)-1:
-        pos==0
+        pos=0
     else:
         pos+=1
-    while not node.node_list[pos]:
+    while not node.node_control[pos]:
         if pos==len(node.node_list)-1:
-            pos==0
+            pos=0
         else:
             pos+=1
     return node.node_list[pos]
@@ -428,9 +428,9 @@ def countdown(num_of_secs):  #Temporizador que marca la revision de estabilidad 
         time.sleep(1)
         num_of_secs -= 1
           
-        
 
-machine_name = socket.gethostname()
-machine_ip = socket.gethostbyname(machine_name)
-node=Node(machine_ip,os.getcwd())
+s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+s.connect(("8.8.8.8", 80))
+ip_server = s.getsockname()[0]
+node=Node(ip_server,os.getcwd())
 run()
