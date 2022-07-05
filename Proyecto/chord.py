@@ -33,11 +33,20 @@ class Listen(object):
     def assign_id(self):
       node.id=node.node_list.index(node.ip)
 
-    def ping(self):
-        return
+    
 
     #def update_file_hash(keys,values):### Para Cargar archivos
          #for key in 
+
+@Pyro4.expose
+class SearchBoss(object):
+      
+    def new_boss(self,ip_boss):
+        node.ip_boss=ip_boss
+        node.there_boss=True
+
+    def ping(self):
+        return
 
 
 @Pyro4.expose
@@ -60,6 +69,10 @@ class ResultConnection(object):
                 return "Nodo aislado"
             else:
                 return "Code #398#" 
+    
+    def ping(self):
+        return
+
 
 @Pyro4.expose
 class FilesManager(object):
@@ -177,12 +190,13 @@ def run():
                     node.stabilized_system=False
                 else:
                     node.stabilized_system=True
-            #elif not check_ping(self.__ip_boss):
-                #   self.there_boss=False
-                #  threading.Thread(target=self.wait_update_boss, args=()).start()
-                # threading.Thread(target=self.get_boss, args=()).start()
             else:
-                listen()
+                threading.Thread(target=listen, args=()).start()
+                while True:
+                 if not check_ping(node.ip_boss):
+                  node.there_boss=False
+                  threading.Thread(target=wait_update_boss, args=()).start()
+                  threading.Thread(target=get_boss, args=()).start()
                                 
 def get_signal():
     Pyro4.Daemon.serveSimple(
@@ -406,6 +420,55 @@ def countdown(num_of_secs):  #Temporizador que marca la revision de estabilidad 
         print(min_sec_format, end='/r')
         time.sleep(1)
         num_of_secs -= 1
+
+def check_ping(host_name):
+    try:
+        uri = "PYRO:Connection@"+host_name+":8003"
+        remote = Pyro4.Proxy(uri)
+        remote.ping()
+    except:
+        return False
+    return True
+     
+def get_boss():
+    
+   for nodo in node.node_list:
+    if not node.there_boss: 
+     if nodo!=node.ip and node.node_control[node.node_list.index(nodo)]:
+        if nodo!=node.ip_boss:
+           uri = "PYRO:SearchBoss@"+nodo+":8002"
+           remote = Pyro4.Proxy(uri)
+           remote.ping()
+           remote.new_boss(nodo)
+           for nd in node.node_list:
+             if not node.there_boss and nodo!=node.ip and node.node_control[node.node_list.index(nodo)] and nd!=nodo:
+                remote.new_boss(nodo)
+        else:
+          continue
+    else:
+        break
+
+
+def wait_update_boss():
+    Pyro4.Daemon.serveSimple(
+    {
+        SearchBoss: "SearchBoss"
+    },
+    host=node.ip,
+    port=8002,
+    ns=False)  
+        
+        #while not node.there_boss:
+        #    conn, addr = self.server.accept() # Establecemos la conexión con el cliente
+         #   if conn:
+         #       data=conn.recv(1024)
+         #       if data.decode('utf-8')=="Soy lider d nodos":
+         #           there_boss=True
+         #           self.__ip_boss=addr[0]
+         #       elif data.decode('utf-8')=="Eres el lider":
+          #          self.__ip_boss=self.__ip
+          #          there_boss=True     
+          #      conn.close()     
      
 s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 s.connect(("8.8.8.8", 80))
