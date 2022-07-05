@@ -22,7 +22,7 @@ class Listen(object):
             node.finger_table[id]=node.give_me_sucesor(id)
 
     def leave_message(self,id):
-       node.node_control[id]=False
+        node.node_control[id]=False
 
     def join_to_system(self,node_control_boss,node_list_boss):
         node.node_control=node_control_boss
@@ -32,7 +32,7 @@ class Listen(object):
         node.ip_boss=ip_boss
 
     def assign_id(self):
-      node.id=node.node_list.index(node.ip)
+        node.id=node.node_list.index(node.ip)
 
     
 
@@ -160,7 +160,6 @@ def create_finger_table():
 
 def run():  
     count=0
-    
     while True:
         if not node.stabilized_system:
             if node.ip_boss == None and not node.leader_calls:
@@ -193,15 +192,15 @@ def run():
                 else:
                     node.stabilized_system=True
             elif count==0 :
-                     threading.Thread(target=listen, args=()).start()
-                     threading.Thread(target=wait_update_boss, args=()).start()
-                     time.sleep(2)
-                     count+=1
+                    threading.Thread(target=listen, args=()).start()
+                    threading.Thread(target=wait_update_boss, args=()).start()
+                    time.sleep(2)
+                    count+=1
             else:     
-                  if node.ip_boss!=None and node.there_boss:
-                   if not check_ping() :
-                    node.there_boss=False
-                    threading.Thread(target=get_boss, args=()).start()
+                if node.ip_boss!=None and node.there_boss:
+                    if not check_ping() :
+                        node.there_boss=False
+                        threading.Thread(target=get_boss, args=()).start()
                     
                 
                     
@@ -230,7 +229,7 @@ def search_boss():
     while ip[len(ip)-1]!='.':
         ip=ip[0:len(ip)-1]
 
-    for i in range(253,254):
+    for i in range(62,63):
         uri = "PYRO:Connection@"+ip+str(i)+":8003"
         if node.NoSereLider==True:
             node.search_to_boss=False
@@ -273,24 +272,19 @@ def stabilize():
                 uri = "PYRO:Stabilize@"+nodo+":8003"
                 remote = Pyro4.Proxy(uri)
                 remote.ping()
-                
                 if not node.node_control[node.node_list.index(nodo)]:
-                        join(nodo)
-                        if node.NodosEncontrados.count(nodo)!=0:
-                            node.NodosEncontrados.remove(nodo)
+                    join(nodo)
+                    if node.NodosEncontrados.count(nodo)!=0:
+                        node.NodosEncontrados.remove(nodo)
                 if first_node_active!=None:
                     first_node_active=nodo   
-            
             except:
                 if node.node_control[node.node_list.index(nodo)]==True:
                     leave(node.node_list.index(nodo))
                 continue
-
         else:
             if first_node_active!=None:
-                first_node_active=nodo 
-
-
+                first_node_active=nodo
     for nodo in node.NodosEncontrados:
             join(nodo)
 
@@ -303,12 +297,12 @@ def leave(id):
     ip_predecessor=get_predecessor(node.node_list[id])
     ip_successor=get_successor(node.node_list[id])
     if ip_predecessor!=node.ip:
-     update_successor(ip_predecessor,ip_successor)
+        update_successor(ip_predecessor,ip_successor)
     else:
-      node.successor=ip_successor
+        node.successor=ip_successor
       
     if ip_successor!=node.ip:
-     update_predecessor(ip_successor,ip_predecessor)
+        update_predecessor(ip_successor,ip_predecessor)
     else:
         node.predecessor=ip_predecessor
     
@@ -333,23 +327,21 @@ def join(ip):
     sucesor=get_successor(ip)
     predecesor=get_predecessor(ip)   
     if ip!=node.ip:    
-     update_successor(ip,sucesor)
-     update_predecessor(ip,predecesor)
+        update_successor(ip,sucesor)
+        update_predecessor(ip,predecesor)
     else:
-      node.sucessor=sucesor
-      node.predecessor=predecesor
+        node.sucessor=sucesor
+        node.predecessor=predecesor
     
     if predecesor!=node.ip:
-     update_successor(predecesor,ip)
+        update_successor(predecesor,ip)
     else:
-     node.sucessor=ip
+        node.sucessor=ip
     
     if sucesor!=node.ip:
-     update_predecessor(sucesor,ip)
+        update_predecessor(sucesor,ip)
     else:
-      node.predecessor=ip
-      
-
+        node.predecessor=ip
     for nodo in node.node_list:         
         if node.node_control[node.node_list.index(nodo)] and nodo!= node.ip:
             try:
@@ -440,22 +432,23 @@ def check_ping():
     return True
      
 def get_boss():
-    
-   for nodo in node.node_list:
-    if not node.there_boss: 
-     if nodo!=node.ip and node.node_control[node.node_list.index(nodo)]:
-        if nodo!=node.ip_boss:
-           uri = "PYRO:SearchBoss@"+nodo+":8002"
-           remote = Pyro4.Proxy(uri)
-           remote.ping()
-           remote.new_boss(nodo)
-           for nd in node.node_list:
-             if not node.there_boss and nodo!=node.ip and node.node_control[node.node_list.index(nodo)] and nd!=nodo:
-                remote.new_boss(nodo)
+    for nodo in node.node_list:
+        if not node.there_boss: 
+            if nodo!=node.ip and node.node_control[node.node_list.index(nodo)]:
+                if nodo!=node.ip_boss:
+                    uri = "PYRO:SearchBoss@"+nodo+":8002"
+                    remote = Pyro4.Proxy(uri)
+                    remote.ping()
+                    remote.new_boss(nodo)
+                    for nd in node.node_list:
+                        if not node.there_boss and nodo!=node.ip and node.node_control[node.node_list.index(nodo)] and nd!=nodo:
+                            remote.new_boss(nodo)
+                else:
+                    continue
         else:
-          continue
-    else:
-        break
+            break
+    if not node.there_boss:
+        node.ip_boss = node.ip
 
 
 def wait_update_boss():
