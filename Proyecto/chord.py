@@ -573,6 +573,7 @@ def update_fingertables_boss():
 
 def stabilize():
     first_node_active=None
+    last_active_node=None
     for nodo in node.node_list:
         if nodo != node.ip:
             try: 
@@ -583,6 +584,7 @@ def stabilize():
                     join(nodo)
                     if node.NodosEncontrados.count(nodo)!=0:
                         node.NodosEncontrados.remove(nodo)
+                last_active_node=nodo
                 if first_node_active!=None:
                     first_node_active=nodo   
             except:
@@ -594,8 +596,9 @@ def stabilize():
                 first_node_active=nodo
     for nodo in node.NodosEncontrados:
             join(nodo)
-
-        #Hay que actualizar el predecesor del primer nodo
+            last_active_node=nodo
+    
+    update_predecessor(first_node_active,last_active_node)
 
     node.NodosEncontrados=[]
 
