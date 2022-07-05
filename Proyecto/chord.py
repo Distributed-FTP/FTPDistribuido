@@ -2,7 +2,6 @@ from pickle import TRUE
 import socket
 import os
 import threading
-from typing_extensions import Self
 import Pyro4
 import time
 
@@ -190,7 +189,7 @@ def run():
     while True:
         if not node.stabilized_system:
             if node.ip_boss == None:
-              if node.leader_calls:
+              if not node.leader_calls:
                 node.search_to_boss=True
                 threading.Thread(target=get_signal, args=()).start()
                 threading.Thread(target=search_boss, args=()).start()
@@ -213,7 +212,7 @@ def run():
                         node.NoSereLider=False
                         break
             elif node.ip_boss==node.ip:                                                      
-                countdown(200)
+                countdown(30)
                 stabilize()
                 if not update_fingertables_boss():
                     node.stabilized_system=False
@@ -395,18 +394,18 @@ def get_predecessor(ip):
             pos-=1
     return node.node_list[pos]
 
-def get_successor(self,ip):
-    pos=self.node_list.index(ip)
-    if pos==len(self.node_list)-1:
+def get_successor(ip):
+    pos=node.node_list.index(ip)
+    if pos==len(node.node_list)-1:
         pos==0
     else:
         pos+=1
-    while not self.node_list[pos]:
-        if pos==len(self.node_list)-1:
+    while not node.node_list[pos]:
+        if pos==len(node.node_list)-1:
             pos==0
         else:
             pos+=1
-    return self.node_list[pos]
+    return node.node_list[pos]
 
 def update_successor(ip,new_successor):
     try:
