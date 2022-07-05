@@ -3,12 +3,7 @@ import socket
 import os
 import threading
 import Pyro4
-#Server= Pyro4.Daemon(
-  #      host="192.168.43.62",
-  #      port=8003,
-  #      ns=False
-   # )
-
+import time
 
 @Pyro4.expose
 class Listen(object):
@@ -130,20 +125,19 @@ def run():
                                 node.ip_boss=="temporal"
                                 node.NoSereLider=False
                                 break
-                elif node.ip_boss==node.ip:                                             
-                           while True:
-                             continue
-                           #stabilize()
-                           #if not update_fingertables_boss():
-                           #   node.stabilized_system=False
-                           #else:
-                           # node.stabilized_system=True
+                elif node.ip_boss==node.ip:                                                      
+                           countdown(200)
+                           stabilize()
+                           if not update_fingertables_boss():
+                              node.stabilized_system=False
+                           else:
+                            node.stabilized_system=True
                 #elif not check_ping(self.__ip_boss):
                  #   self.there_boss=False
                   #  threading.Thread(target=self.wait_update_boss, args=()).start()
                    # threading.Thread(target=self.get_boss, args=()).start()
-                #else:
-                 #    listen()
+                else:
+                     listen()
                                 
 def get_signal():
 
@@ -179,7 +173,7 @@ def search_boss():
             if node.NoSereLider==True:
                 node.search_to_boss=False
                 break
-            if node.NodosEncontrados.count(ip+str(i))==0:  
+            if node.NodosEncontrados.count(ip+str(i))==0 and ip+str(i)!=node.ip:  
                 try:
                     remote = Pyro4.Proxy(uri)
                     data=remote.return_orden("Code #399#",node.ip,node.NodosEncontrados)
@@ -347,6 +341,16 @@ def update_predecessor(ip,new_predecessor):
               uri = "PYRO:Stabilize@"+ip+":8005"
               remote = Pyro4.Proxy(uri)
               remote.update_predecesor(new_predecessor)
+
+def countdown(self,num_of_secs):  #Temporizador que marca la revision de estabilidad del sistema
+        while num_of_secs:
+            m, s = divmod(num_of_secs, 60)
+            min_sec_format = '{:02d}:{:02d}'.format(m, s)
+            print(min_sec_format, end='/r')
+            time.sleep(1)
+            num_of_secs -= 1
+          
+        
 
 machine_name = socket.gethostname()
 machine_ip = socket.gethostbyname(machine_name)
