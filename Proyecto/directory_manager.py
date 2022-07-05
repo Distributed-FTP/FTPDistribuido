@@ -3,7 +3,8 @@ import Pyro4
 
 Pyro4.expose
 class RecvBytesforDownload(object):
-  def 
+  def get_bytes(self, bytes):
+      return bytes
 
 Pyro4.Daemon.serveSimple(
     {
@@ -161,6 +162,7 @@ class Directory_Manager():
                 
         uri = "PYRO:FilesManager@"+self.__ip+":8011"
         remote = Pyro4.Proxy(uri)
+        first = True
         while True:
             bytes_recieved = socket_client.recv(self.__buffer)
             remote.upload(self.path_default + file_name, read_mode, bytes_recieved)

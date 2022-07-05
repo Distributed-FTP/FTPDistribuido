@@ -192,7 +192,7 @@ class ResultConnection(object):
 @Pyro4.expose
 class FilesManager(object):
     
-    def edit(self,name:str, write_mode: str, content: bytes,first):
+    def edit(self,name:str, write_mode: str, content: bytes,first:bool):
       if first:  
         file_id=node.files_hash.get(name)
         
@@ -288,7 +288,7 @@ class FilesManager(object):
         else:
            return find_file(hash_code,None, id, Search_Type.STATE,name)
     
-    def upload(self, name:str, write_mode: str, content: bytes,first):
+    def upload(self, name:str, write_mode: str, content: bytes,first:bool):
         if first:
                 ip=None
                 count_files=0
