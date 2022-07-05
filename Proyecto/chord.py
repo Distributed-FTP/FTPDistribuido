@@ -61,7 +61,53 @@ class ResultConnection(object):
             else:
                 return "Code #398#" 
 
+@Pyro4.expose
+class FilesManager(object):
+    @property
+    def delete_property(self, name:str):
+        os.remove(name)
+        
+    @property
+    def get_size_property(self,root):
+        return os.path.getsize(root)
+    
+    @property
+    def rename_property(self, name:str, new_name:str):
+        os.rename(name, new_name)
+    
+    @property
+    def state_property(self, name:str):
+        return os.stat(name)
+    
+@Pyro4.expose
+class DirectoriesManager(object):
+    @property
+    def create_property(self, name:str):
+        os.mkdir(name)
+    
+    @property
+    def delete_property(self, name:str):
+        os.rmdir(name)
+        
+    @property
+    def rename_property(self, name:str, new_name:str):
+        os.rename(name, new_name)
+    
+    @property
+    def state_property(self, name:str):
+        return os.stat(name)
+    
+    def create_directory(self,name:str):
+        self.create_property(name)
 
+    def change_name_directory(self,name,new_name):
+        self.rename_property(name)
+         
+    def delete_directory(self,name):
+        self.delete_property(name)
+
+    def state_directory(self,name):
+        return self.state_property(name)
 
 @Pyro4.expose
 class Node:
@@ -85,92 +131,6 @@ class Node:
         self.files_hash=dict()
         self.path=path
         self.node_control=[]
-
-    '''
-        Properties
-    '''
-    @property
-    def create_directory_property(self, name:str):
-        os.mkdir(name)
-    
-    @property
-    def delete_directory_property(self, name:str):
-        os.rmdir(name)
-        
-    @property
-    def rename_directory_property(self, name:str, new_name:str):
-        os.rename(name, new_name)
-    
-    @property
-    def state_directory_property(self, name:str):
-        return os.stat(name)
-    
-    @property
-    def delete_file_property(self, name:str):
-        os.remove(name)
-        
-    @property
-    def get_size_file_property(self,root):
-        return self.get_size_file(root)
-    
-    @property
-    def rename_file_property(self, name:str, new_name:str):
-        os.rename(name, new_name)
-    
-    @property
-    def state_file_property(self, name:str):
-        return os.stat(name)
-    
-    #@property
-    #def id(self):
-    #    return self.__id
-    
-    #@property
-    #def successor(self):
-    #    return self.__successor
-    
-    #@property
-    #def predecessor(self):
-    #    return self.__predecessor
-    
-    '''
-        Actions
-    '''
-    def create_directory(self,name:str):
-        self.create_directory_property(name)
-        for nodo in self.node_list:
-            if nodo!=self.__ip:
-                if self.node_control[self.node_list.index(nodo)]==True:
-                    node = get_proxy(nodo)
-                    try:
-                          node.create_directory_property(name)
-                    except:
-                        stabilized_system=False
-
-    def changeName_directory(self,name,new_name):
-        self.rename_directory_property(name)
-        for nodo in self.node_list:
-            if nodo!=self.__ip:
-                if self.node_control[self.node_list.index(nodo)]==True:
-                    node = get_proxy(nodo)
-                    try:
-                          node.rename_directory_property(name)
-                    except:
-                        stabilized_system=False
-         
-    def delete_directory(self,name):
-        self.delete_directory_property(name)
-        for nodo in self.node_list:
-            if nodo!=self.__ip:
-                if self.node_control[self.node_list.index(nodo)]==True:
-                    node = get_proxy(nodo)
-                    try:
-                          node.delete_directory_property(name)
-                    except:
-                        stabilized_system=False
-
-    def state_directory(self,name):
-        return self.state_directory_property(name)
 
     def give_me_sucesor(self, id):
         pos=id+1
@@ -446,8 +406,7 @@ def countdown(num_of_secs):  #Temporizador que marca la revision de estabilidad 
         print(min_sec_format, end='/r')
         time.sleep(1)
         num_of_secs -= 1
-          
-
+     
 s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 s.connect(("8.8.8.8", 80))
 ip_server = s.getsockname()[0]
