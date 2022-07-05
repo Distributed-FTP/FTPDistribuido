@@ -17,7 +17,7 @@ class Directory_Manager():
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         s.connect(("8.8.8.8", 80))
         self.__ip = s.getsockname()[0]
-        Thread(target=self.server_download).start()
+        #Thread(target=self.server_download).start()
     
     #Directories
     def create_directory(self, directory_name: str):
