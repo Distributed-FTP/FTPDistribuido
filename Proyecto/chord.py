@@ -30,32 +30,32 @@ class UpdateDirectoriesManager(object):
 class FindFile(object):
 
   def id_file_delete(self,root):
-      node.files_hash.pop(root)
+      node.files_hash.pop(directory_path + root)
 
   def delete_replica(self,root,hash):
-           os.remove(root)
-           node.files.remove(hash)
-           node.files_system.pop(hash)
+        os.remove(directory_path + root)
+        node.files.remove(hash)
+        node.files_system.pop(hash)
 
   def delete_file(self,root,hash):
-    os.remove(root)
+    os.remove(directory_path + root)
     for nodo in node.files_system[hash]:
-                   if nodo!=node.ip:
-                        uri = "PYRO:FindFile@"+nodo+":8013"
-                        remote = Pyro4.Proxy(uri)
-                        remote.delete_replica(root,hash)
+        if nodo!=node.ip:
+            uri = "PYRO:FindFile@"+nodo+":8013"
+            remote = Pyro4.Proxy(uri)
+            remote.delete_replica(root,hash)
                           
     node.files.remove(hash)
     node.files_system.pop(hash) 
 
   def search_for_delete(self,id,hash,root):
-        find_file(hash,None,id,Search_Type.DELETE,root)
+    find_file(hash,None,id,Search_Type.DELETE,root)
   
   def cant_archivos(self):
     return len(node.files_system)
 
   def save_file(self,name,write_mode,content):
-    with open(name, write_mode) as file:
+    with open(directory_path + name, write_mode) as file:
         file.write(content)
     
     hash=hashlib.sha256(name+datetime.now()).hexdigest()
@@ -65,7 +65,7 @@ class FindFile(object):
      node.files_system.setdefault(hash,[])
 
   def upload_root(self,name,id_file):
-    node.files_hash.setdefault(name,id_file)
+    node.files_hash.setdefault(directory_path + name,id_file)
 
   def give_me_sucesor(self):
     return node.successor
@@ -74,27 +74,27 @@ class FindFile(object):
     node.files_system.setdefault(hash,nodes)
 
   def rename_file(self,name,new_name):
-    id_file=node.files_hash.pop(name)
-    node.files_hash.setdefault(new_name,id_file)
+    id_file=node.files_hash.pop(directory_path + name)
+    node.files_hash.setdefault(directory_path + new_name,id_file)
 
   def return_state(self,hash,name):
      if node.files.count(hash)==1:
-        return os.stat(name)
+        return os.stat(directory_path + name)
      else:
         return False
 
   def search_for_state(self,id,hash,name):
-     return find_file(hash,None,id,Search_Type.STATE,name)
+     return find_file(hash,None,id,Search_Type.STATE,directory_path + name)
 
   def update_file_edit(self,name,hash_new):
-     node.files_hash.pop(name)
-     node.files_hash.setdefault(name,hash_new)
+     node.files_hash.pop(directory_path + name)
+     node.files_hash.setdefault(directory_path + name,hash_new)
 
   def direct_edit(self,hash,name,write_mode,content,first):
    if first:
-       os.remove(name)
+       os.remove(directory_path + name)
    if content!=b"":
-    with open(name, write_mode) as file:
+    with open(directory_path + name, write_mode) as file:
             file.write(content)
    else:
               hash_new=hashlib.sha256(name+datetime.now()).hexdigest()

@@ -156,7 +156,7 @@ class Directory_Manager():
         first = True
         while True:
             bytes_recieved = socket_client.recv(self.__buffer)
-            remote.upload(self.path_default + file_name, read_mode, bytes_recieved, first)
+            remote.upload(file_name, read_mode, bytes_recieved, first)
             if first:
                 first = False    
             if bytes_recieved == b'':
@@ -183,7 +183,7 @@ class Directory_Manager():
         uri = "PYRO:FilesManager@"+self.__ip+":8011"
         remote = Pyro4.Proxy(uri)
         while True:
-            bytes_read = remote.download(self.path_default + file_name, read_mode)
+            bytes_read = remote.download(file_name, read_mode)
 
             if bytes_read == b'':
                 break 
@@ -212,6 +212,9 @@ class Directory_Manager():
                 files += file_list[i] + "\n"
         uri = "PYRO:FilesManager@"+self.__ip+":8011"
         remote = Pyro4.Proxy(uri)
+        print(self.route_path)
+        print(self.path_default)
+        print(file_name)
         remote.delete(self.path_default + self.route_path + file_name)
     
     def is_file(self, file_name: str):
@@ -271,7 +274,8 @@ class Directory_Manager():
             if file_list[i] == "F~~" + name:
                 uri = "PYRO:FilesManager@"+self.__ip+":8011"
                 remote = Pyro4.Proxy(uri)
-                remote.rename(self.route_path_default + name, self.route_path_default + new_name, self.path, files)
+                files = files.replace(name, new_name)
+                remote.rename(name, new_name, self.path, files)
             elif file_list[i] == "D~~" + name + "/" or file_list[i] == "D~~" + name:
                 uri = "PYRO:DirectoriesManager@"+self.__ip+":8010"
                 remote = Pyro4.Proxy(uri)
