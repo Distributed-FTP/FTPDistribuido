@@ -275,8 +275,8 @@ class Directory_Manager():
             elif file_list[i] == "D~~" + name + "/" or file_list[i] == "D~~" + name:
                 uri = "PYRO:DirectoriesManager@"+self.__ip+":8010"
                 remote = Pyro4.Proxy(uri)
+                files = files.replace(name, new_name)
                 remote.change_name_directory(self.route_path_default + name, self.route_path_default + new_name, self.path, files)
-        files = files.replace(name, new_name)
        
         
     #Extra
