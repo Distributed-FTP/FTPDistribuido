@@ -498,12 +498,13 @@ def run():
                         node.NoSereLider=False
                         break
             elif node.ip_boss==node.ip:                                                      
-                countdown(10)
+                countdown(20,"")
                 stabilize()
                 if not update_fingertables_boss():
                     node.stabilized_system=False
                 else:
                     node.stabilized_system=True
+                    countdown(10,"Estabilidad")
             elif count==0 :
                     threading.Thread(target=listen, args=()).start()
                     threading.Thread(target=wait_update_boss, args=()).start()
@@ -726,13 +727,15 @@ def update_predecessor(ip,new_predecessor):
     remote = Pyro4.Proxy(uri)
     remote.update_predecesor(new_predecessor)
 
-def countdown(num_of_secs):  #Temporizador que marca la revision de estabilidad del sistema
+def countdown(num_of_secs,stabilize):  #Temporizador que marca la revision de estabilidad del sistema
     while num_of_secs:
         m, s = divmod(num_of_secs, 60)
         min_sec_format = '{:02d}:{:02d}'.format(m, s)
         print(min_sec_format, end='/r')
         time.sleep(1)
         num_of_secs -= 1
+    if stabilize=="Estabilidad":
+        node.stabilized_system=False
 
 def check_ping():
     try:
