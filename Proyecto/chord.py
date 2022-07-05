@@ -193,11 +193,12 @@ def run():
             else:
                 threading.Thread(target=listen, args=()).start()
                 while True:
-                 if not check_ping(node.ip_boss):
-                  node.there_boss=False
-                  threading.Thread(target=wait_update_boss, args=()).start()
-                  threading.Thread(target=get_boss, args=()).start()
-                                
+                 if node.stabilized_system:
+                  if not check_ping(node.ip_boss):
+                   node.there_boss=False
+                   threading.Thread(target=wait_update_boss, args=()).start()
+                   threading.Thread(target=get_boss, args=()).start()
+                                    
 def get_signal():
     Pyro4.Daemon.serveSimple(
     {
@@ -221,7 +222,7 @@ def search_boss():
     while ip[len(ip)-1]!='.':
         ip=ip[0:len(ip)-1]
 
-    for i in range(62,63):
+    for i in range(253,254):
         uri = "PYRO:Connection@"+ip+str(i)+":8003"
         if node.NoSereLider==True:
             node.search_to_boss=False
