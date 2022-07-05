@@ -319,8 +319,15 @@ def leave(id):
     node.node_control[id]=False
     ip_predecessor=get_predecessor(node.node_list[id])
     ip_successor=get_successor(node.node_list[id])
-    update_successor(ip_predecessor,ip_successor)
-    update_predecessor(ip_successor,ip_predecessor)
+    if ip_predecessor!=node.ip:
+     update_successor(ip_predecessor,ip_successor)
+    else:
+      node.successor=ip_successor
+      
+    if ip_successor!=node.ip:
+     update_predecessor(ip_successor,ip_predecessor)
+    else:
+        node.predecessor=ip_predecessor
     
     for nodo in node.node_list:
         if nodo != node.node_list[id] and nodo != node.ip:
