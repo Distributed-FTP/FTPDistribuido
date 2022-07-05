@@ -308,7 +308,7 @@ class FilesManager(object):
                     except:
                         stabilized_system=False
                         return False
-                count+=1
+                    count+=1
             try:    
                 hash=hashlib.sha256(name+datetime.now()).hexdigest()
                 if ip!=node.ip:
