@@ -49,7 +49,6 @@ class SearchBoss(object):
     def ping(self):
         return
 
-
 @Pyro4.expose
 class ResultConnection(object):
     def give_me_nodos_encontrados(self):
@@ -134,7 +133,7 @@ class Node:
         self.successor=None
         self.finger_table=dict()
         self.ip_boss=None
-        self.there_boss=False
+        self.there_boss=True
         self.node_list=[]
         self.requests=[]  # aqui se guardan las requests de los clientes
         self.leader_calls=False
@@ -200,7 +199,7 @@ def run():
                      count+=1
             else:     
                   if node.ip_boss!=None and node.there_boss:
-                   if not check_ping():
+                   if not check_ping() :
                     node.there_boss=False
                     threading.Thread(target=get_boss, args=()).start()
                     
