@@ -14,8 +14,7 @@ from Accessories.search_type import Search_Type
 @Pyro4.expose
 class UpdateDirectoriesManager(object):
     def create_directory(self,root):
-        print("Creating directory: " + root)
-        os.mkdir(os.getcwd() + root)
+        os.mkdir(directory_path + root)
 
     def change_name_directory(self,root,new_name):
         os.rename(root,new_name)
@@ -24,7 +23,7 @@ class UpdateDirectoriesManager(object):
         os.rmdir(root)
     
     def update_data_file(self,data):
-        with open(os.getcwd() + "/Reports/files.fl", 'w') as f:
+        with open(directory_path + "/Reports/files.fl", 'w') as f:
             f.write(data)
 
 @Pyro4.expose
@@ -915,6 +914,7 @@ if __name__ == "__main__":
     ip_server = s.getsockname()[0]
     s.close()
     node=Node(ip_server,os.getcwd())
+    directory_path = os.getcwd()
     threading.Thread(target=createServerDM, args=()).start()
     threading.Thread(target=createServerFM, args=()).start()
     threading.Thread(target=createServerUDM, args=()).start()
