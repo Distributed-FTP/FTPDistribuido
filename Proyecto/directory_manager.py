@@ -1,21 +1,11 @@
 import socket
+from threading import Thread
 import Pyro4
-
-s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-s.connect(("8.8.8.8", 80))
 
 Pyro4.expose
 class RecvBytesforDownload(object):
   def get_bytes(self, bytes):
       return bytes
-
-Pyro4.Daemon.serveSimple(
-    {
-       RecvBytesforDownload : "RecvBytesforDownload"
-    },
-    host=s.getsockname()[0],
-    port=8014,
-    ns=False)
 
 class Directory_Manager():
     def __init__(self, path: str):
@@ -27,6 +17,7 @@ class Directory_Manager():
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         s.connect(("8.8.8.8", 80))
         self.__ip = s.getsockname()[0]
+        Thread(target=self.server_download).start()
     
     #Directories
     def create_directory(self, directory_name: str):
@@ -246,7 +237,14 @@ class Directory_Manager():
             return True
         return False
      
-   
+    def server_download(self):
+        Pyro4.Daemon.serveSimple(
+    {
+       RecvBytesforDownload : "RecvBytesforDownload"
+    },
+    host=self.__ip,
+    port=8014,
+    ns=False)
     #All
     def rename(self, name: str, new_name: str):
         name = name.replace(self.route_path_default, "")
