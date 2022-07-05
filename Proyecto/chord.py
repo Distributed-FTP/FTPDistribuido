@@ -193,13 +193,13 @@ def run():
                 else:
                     node.stabilized_system=True
             else:
-                 if count==0:
+                 if count==0 :
                      threading.Thread(target=listen, args=()).start()
+                     threading.Thread(target=wait_update_boss, args=()).start()
                      count+=1
-                 if node.successor!=None:
-                  if not check_ping(node.ip_boss):
+                 if len(node.node_list)>0 :
+                  if not check_ping():
                    node.there_boss=False
-                   threading.Thread(target=wait_update_boss, args=()).start()
                    threading.Thread(target=get_boss, args=()).start()
                 
                     
@@ -428,9 +428,9 @@ def countdown(num_of_secs):  #Temporizador que marca la revision de estabilidad 
         time.sleep(1)
         num_of_secs -= 1
 
-def check_ping(host_name):
+def check_ping():
     try:
-        uri = "PYRO:Connection@"+host_name+":8003"
+        uri = "PYRO:Connection@"+node.ip_boss+":8003"
         remote = Pyro4.Proxy(uri)
         remote.ping()
     except:
