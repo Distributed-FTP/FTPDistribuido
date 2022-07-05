@@ -1,11 +1,14 @@
 from itertools import count
 from pickle import TRUE
 from platform import node
+from random import Random, random
 import socket
 import os
 import threading
 import Pyro4
 import time
+import hashlib
+from Accessories.search_type import Search_Type
 
 Pyro4.expose
 class UpdateDirectoriesManager(object):
@@ -19,6 +22,108 @@ class UpdateDirectoriesManager(object):
   def delete_directory(self,root):
     os.rmdir(root)
 
+@Pyro4.expose
+class FindFile(object):
+
+  def id_file_delete(self,root):
+      node.files_hash.pop(root)
+
+  def delete_replica(self,root,hash):
+           os.remove(root)
+           node.files.remove(hash)
+           node.files_system.pop(hash)
+
+  def delete_file(self,root,hash):
+    os.remove(root)
+    for nodo in node.files_system[hash]:
+                   if nodo!=node.ip:
+                        uri = "PYRO:FindFile@"+nodo+":8013"
+                        remote = Pyro4.Proxy(uri)
+                        remote.delete_replica(root,hash)
+                          
+    node.files.remove(hash)
+    node.files_system.pop(hash) 
+
+  def search_for_delete(self,id,hash,root):
+        find_file(hash,None,id,Search_Type.DELETE,root)
+  
+  def cant_archivos(self):
+    return len(node.files_system)
+
+  def save_file(self,name,write_mode,content):
+    with open(name, write_mode) as file:
+        file.write(content)
+    
+    hash=hashlib.sha256(name).hexdigest()
+    if node.files.count(hash)==0:
+     node.files.append(hash)
+    if list(node.files_system.keys()).count(hash)==0:
+     node.files_system.setdefault(hash,[])
+
+  def upload_root(self,name,id_file):
+    node.files_hash.setdefault(name,id_file)
+
+  def give_me_sucesor(self):
+    return node.successor
+
+  def update_replicas(self,hash,nodes):
+    node.files_system.setdefault(hash,nodes)
+
+  def rename_file(self,name,new_name):
+    id_file=node.files_hash.pop(name)
+    node.files_hash.setdefault(new_name,id_file)
+
+  def return_state(self,hash,name):
+     if node.files.count(hash)==1:
+        return os.stat(name)
+     else:
+        return False
+
+  def search_for_state(self,id,hash,name):
+     return find_file(hash,None,id,Search_Type.STATE,name)
+
+  def update_file_edit(self,name,hash_new):
+     node.files_hash.pop(name)
+     node.files_hash.setdefault(name,hash_new)
+
+  def direct_edit(self,hash,name,write_mode,content,first):
+   if first:
+       os.remove(name)
+   if content!=b"":
+    with open(name, write_mode) as file:
+            file.write(content)
+   else:
+              hash_new=hashlib.sha256(name).hexdigest()
+              node.files_system.setdefault(hash_new,node.files_system.get(hash))    #anadir el nuevo hash junto a la lista de ips donde esta el archivo
+              node.files.remove(hash)
+              node.files.append(hash_new) ##Anadir el nuevo hash
+              node.files_hash.pop(name)
+              node.files_hash.setdefault(name,id+","+hash_new)
+
+              for nodo in node.node_list:
+                    if nodo!=node.ip:
+                        if node.node_control[node.node_list.index(nodo)]:
+                            uri = "PYRO:FindFile@"+nodo+":8013"
+                            remote = Pyro4.Proxy(uri)
+                            remote.update_file_edit(name,id+","+hash_new)
+
+  def search_edit(self,hash,id,root,write_mode,content,first):
+     find_file(hash=hash,write_mode=write_mode,id=id,Search_Type=Search_Type.EDIT,name=root,content=content,first=first)
+
+  def get_file(self,name,read_mode):
+      with open(name, read_mode) as f:
+             while True:
+                bytes_read = f.read()
+                if bytes_read == b'':
+                    break
+                else:
+                    files += str(bytes_read)
+                    uri = "PYRO:FindFile@"+nodo+":8013"
+                    remote = Pyro4.Proxy(uri)
+                    remote.TT(bytes_read)
+
+  def search_file(self,hash,read_mode,id,root):
+    find_file(hash,read_mode,id,Search_Type.DOWNLOAD,root)
 
 @Pyro4.expose
 class Listen(object):
@@ -45,11 +150,6 @@ class Listen(object):
 
     def assign_id(self):
         node.id=node.node_list.index(node.ip)
-
-    
-
-    #def update_file_hash(keys,values):### Para Cargar archivos
-         #for key in 
 
 @Pyro4.expose
 class SearchBoss(object):
@@ -85,51 +185,206 @@ class ResultConnection(object):
     def ping(self):
         return
 
-
-
 @Pyro4.expose
 class FilesManager(object):
-    @property
-    def delete_property(self, name:str):
-        os.remove(name)
+    
+    def edit(self,name:str, write_mode: str, content: bytes,first):
+      if first:  
+        file_id=node.files_hash.get(name)
         
-    @property
-    def get_size_property(self,root):
-        return os.path.getsize(root)
-    
-    @property
-    def rename_property(self, name:str, new_name:str):
-        os.rename(name, new_name)
-    
-    @property
-    def state_property(self, name:str):
-        return os.stat(name)
-    
-    @property
-    def upload_property(self, name:str, write_mode: str, content: bytes):
-        None
-    
-    @property
-    def download_property(self, name:str, read_mode: str):
-        None
+        hash_code = file_id
+        id=""
+        while hash_code[0]!=",":
+            id+=hash_code[0]
+            hash_code=hash_code[1:len(hash_code)-1]
+        hash_code=hash_code[1:len(hash_code)-1]
+
+        if node.files.count(hash_code)==1:
+             
+             os.remove(name)
+             with open(name,write_mode) as f: 
+                f.write(content)
+                ipDondeEsta=node.ip
+             
+             if content==b"":
+              hash_new=hashlib.sha256(name).hexdigest()
+              node.files_system.setdefault(hash_new,node.files_system.get(hash_code))    #anadir el nuevo hash junto a la lista de ips donde esta el archivo
+              node.files.remove(hash)
+              node.files.append(hash_new) ##Anadir el nuevo hash
+              node.files_hash.pop(name)
+              node.files_hash.setdefault(name,id+","+hash_new)
+
+              for nodo in node.node_list:
+                    if nodo!=node.ip:
+                        if node.node_control[node.node_list.index(nodo)]:
+                            uri = "PYRO:FindFile@"+nodo+":8013"
+                            remote = Pyro4.Proxy(uri)
+                            remote.update_file_edit(name,id+","+hash_new)                         
+                            
+
+        else:
+           ipDondeEsta=find_file(hash_code,write_mode, id, Search_Type.EDIT,name,content,first)
         
+      else:
+        uri = "PYRO:FindFile@"+ipDondeEsta+":8013"
+        remote = Pyro4.Proxy(uri)
+        remote.direct_edit(hash_code,name,write_mode,content)
+                      
     def delete(self, root:str):
-        self.delete_property(root)
-        
-    def get_size(self,root):
-        return self.get_size_property(root)
+        file_id=node.files_hash.get(root)
+        for nodo in node.node_list: 
+            if nodo!=node.ip:
+                if node.node_control[node.node_list.index(nodo)]==True:
+                    uri = "PYRO:FindFile@"+nodo+":8013"
+                    remote = Pyro4.Proxy(uri)
+                    remote.id_file_delete(root)
+                                 
+        node.files_hash.pop(root)
+
+        hash_code = file_id
+        id=""
+        while hash_code[0]!=",":
+            id+=hash_code[0]
+            hash_code=hash_code[1:len(hash_code)-1]
+        hash_code=hash_code[1:len(hash_code)-1]
+
+        if node.files.count(hash)==1:
+              os.remove(root)               
+              node.files.remove(hash)
+              for nodo in node.files_system.get(hash):
+                  if nodo!=node.ip:
+                     uri = "PYRO:FindFile@"+nodo+":8013"
+                     remote = Pyro4.Proxy(uri)
+                     remote.delete_replica(root,hash_code)
+        else:
+         find_file(hash_code, None, id, Search_Type.DELETE,root)
     
     def rename(self, name:str, new_name:str):
-        self.rename_property(name, new_name)
+          file_id= node.files_hash.pop(name)
+          node.files_hash.setdefault(new_name,file_id)
+          for nodo in node.node_list:
+             if nodo!=node.ip:
+                if node.node_control[self.node_list.index(nodo)]:
+                    uri = "PYRO:FindFile@"+nodo+":8013"
+                    remote = Pyro4.Proxy(uri)
+                    remote.rename_file(name,new_name)
         
     def state(self, name:str):
-        return self.state_property(name)
+        file_id=self.files_hash.get(name)
+        
+        hash_code = file_id
+        id=""
+        while hash_code[0]!=",":
+            id+=hash_code[0]
+            hash_code=hash_code[1:len(hash_code)-1]
+        hash_code=hash_code[1:len(hash_code)-1]
+
+        if node.files.count(hash_code)==1:
+           return os.stat(name)
+        else:
+           return find_file(hash_code,None, id, Search_Type.STATE,name)
     
-    def upload(self, name:str, write_mode: str, content: bytes):
-        self.upload_property(name, write_mode, content)
+    def upload(self, name:str, write_mode: str, content: bytes,first):
+        if first:
+                ip=None
+                count_files=0
+                count=0
+                for nodo in node.node_list:
+                    if node.node_control[count]==True and nodo!=node.ip:
+                        try:
+                            uri = "PYRO:FindFile@"+nodo+":8013"
+                            remote = Pyro4.Proxy(uri)
+                            CantArchivos=remote.cant_archivos()
+ 
+                            if count==0:
+                                ip = nodo
+                                count_files=CantArchivos
+                            elif CantArchivos<count_files:
+                                ip = nodo
+                                count_files=CantArchivos
+                        except:
+                            stabilized_system=False
+                            return False
+                    count+=1
+                try:    
+                    hash=hashlib.sha256(name).hexdigest()
+                    if ip!=node.ip:
+                     id=node.node_list.index(ip)
+                     uri = "PYRO:FindFile@"+ip+":8013"
+                     remote = Pyro4.Proxy(uri)
+                     remote.save_file(id,name,write_mode,content)
+                     id_file_return=id+","+hash                    
+                    else:
+                     with open(name, write_mode) as file:
+                            file.write(content)
+                     if node.files.count(hash)==0:
+                        node.files.append(hash)
+                     if list(node.files_system.keys()).count(hash)==0:
+                        node.files_system.setdefault(hash,[])
+                     id_file_return=node.id+","+hash
+                    
+                    node.files_hash.setdefault(name,id_file_return)
+                    
+                    for nodo in node.node_list:
+                        if nodo!=node.ip:
+                            if node.node_control[node.node_list.index(nodo)]==True:
+                                    uri = "PYRO:FindFile@"+nodo+":8013"
+                                    remote = Pyro4.Proxy(uri)
+                                    remote.upload_root(name,id_file_return)
+                                    
+                    nodes_where_the_file_is=[]    
+                    nodes_where_the_file_is.append(ip)
+                    count_replicas=3
+                    
+                    while count_replicas>0:#Replicacion
+                        if ip!=self.ip:
+                           uri = "PYRO:FindFile@"+ip+":8013"
+                           remote = Pyro4.Proxy(uri)
+                           ip=remote.give_me_sucesor()   
+                        else:
+                          ip=node.successor
+                        
+                        if ip!=node.ip: 
+                            uri = "PYRO:FindFile@"+ip+":8013"
+                            remote = Pyro4.Proxy(uri)
+                            remote.save_file(name,write_mode,content)  
+                            if nodes_where_the_file_is.count(ip)==0:
+                             nodes_where_the_file_is.append(ip)
+                        
+                            count_replicas-=1
+                         
+                            for ip in nodes_where_the_file_is:
+                              uri = "PYRO:FindFile@"+ip+":8013"
+                              remote = Pyro4.Proxy(uri)
+                              remote.update_replicas(hash,nodes_where_the_file_is)  
+                except:
+                    stabilized_system=False
+                    return False                   
     
     def download(self, name:str, read_mode: str):
-        return self.download_property(name, read_mode)
+        file_id=node.files_hash.get(name)
+        
+        hash_code = file_id
+        id = ""
+        while hash_code[0]!=",":
+            id += hash_code[0]
+            hash_code = hash_code[1:len(hash_code)-1]
+        hash_code = hash_code[1:len(hash_code)-1]
+
+        if node.files.count(hash_code)==1:
+            with open(name, read_mode) as f:
+             while True:
+                bytes_read = f.read()
+                if bytes_read == b'':
+                    break
+                else:
+                    files += str(bytes_read)
+                    uri = "PYRO:FindFile@"+nodo+":8013"
+                    remote = Pyro4.Proxy(uri)
+                    remote.TT(bytes_read)
+
+        else:
+             find_file(hash_code,read_mode, id, Search_Type.DOWNLOAD,name)
     
 @Pyro4.expose
 class DirectoriesManager(object):
@@ -547,6 +802,114 @@ def createServer():
     host=node.ip,
     port=8012,
     ns=False)
+
+    Pyro4.Daemon.serveSimple(
+    {
+       FindFile : "FindFile"
+    },
+    host=node.ip,
+    port=8013,
+    ns=False)
+
+def find_file(self,hash,write_mode,id,search_type: Search_Type,root,content=None,first=None):
+        if search_type == Search_Type.DOWNLOAD:  
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s: 
+                keys=self.finger_table.keys()
+                if list(keys).count(id)==1:
+                    uri = "PYRO:FindFile@"+node.node_list[self.finger_table[id]]+":8013"
+                    remote = Pyro4.Proxy(uri)
+                    remote.get_file(root,write_mode)
+                     
+                else:
+                    dictionary=self.finger_table
+                    value=dictionary.popitem()
+                    value=value[1]
+                    
+                    while True:
+                        if value<id:
+                            break
+                        else:
+                            value=dictionary.popitem()
+                            value=value[1]
+
+                    uri = "PYRO:FindFile@"+node.node_list[self.finger_table[id]]+":8013"
+                    remote = Pyro4.Proxy(uri)
+                    remote.search_file(hash,write_mode,id,root) 
+                
+
+        elif search_type == Search_Type.EDIT:
+                keys=self.finger_table.keys()
+                if list(keys).count(id)==1:
+                    uri = "PYRO:FindFile@"+node.node_list[self.finger_table[id]]+":8013"
+                    remote = Pyro4.Proxy(uri)
+                    return remote.direct_edit(hash,root,write_mode,content,first)
+                else:
+                    dictionary=self.finger_table
+                    value=dictionary.popitem()
+                    value=value[1]
+                    
+                    while True:
+                        if value<id:
+                            break
+                        else:
+                            value=dictionary.popitem()
+                            value=value[1]
+                          
+                    
+                    uri = "PYRO:FindFile@"+node.node_list[value]+":8013"
+                    remote = Pyro4.Proxy(uri)
+                    return remote.search_edit(hash,id,root,write_mode,content,first)
+                 
+
+        elif search_type== Search_Type.STATE:
+                
+                keys=node.finger_table.keys()
+                if list(keys).count(id)==1:
+                    uri = "PYRO:FindFile@"+node.node_list[value]+":8013"
+                    remote = Pyro4.Proxy(uri)
+                    return remote.return_state(hash,root)
+                               
+                else:
+                    dictionary=self.finger_table
+                    value=dictionary.popitem()
+                    value=value[1]
+                    
+                    while True:
+                        if value<id:
+                            break
+                        else:
+                            value=dictionary.popitem()
+                            value=value[1]
+
+                    uri = "PYRO:FindFile@"+node.node_list[value]+":8013"
+                    remote = Pyro4.Proxy(uri)
+                    return remote.search_for_state(id,hash,root) 
+                
+                    
+        elif search_type == Search_Type.DELETE:
+           
+                keys=node.finger_table.keys()
+                if list(keys).count(id)==1:
+                    uri = "PYRO:FindFile@"+node.node_list[self.finger_table[id]]+":8013"
+                    remote = Pyro4.Proxy(uri)
+                    remote.id_file_delete(root,hash)
+                else:
+                    dictionary=node.finger_table
+                    value=dictionary.popitem()
+                    value=value[1]
+        
+                    while True:
+                        if value<id:
+                            break
+                        else:
+                            value=dictionary.popitem()
+                            value=value[1]
+                          
+                    
+                    uri = "PYRO:FindFile@"+node.node_list[value]+":8013"
+                    remote = Pyro4.Proxy(uri)
+                    remote.search_for_delete(id,hash,root)
+
 
 if __name__ == "__main__":  
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
