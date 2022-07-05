@@ -360,8 +360,8 @@ def join(ip):
       node.predecessor=ip
       
 
-    for nodo in node.node_list:            
-        if node.node_control[node.node_list.index(nodo)]:
+    for nodo in node.node_list:         
+        if node.node_control[node.node_list.index(nodo)] and nodo!= node.ip:
             try:
                 uri = "PYRO:Stabilize@"+nodo+":8005"
                 remote = Pyro4.Proxy(uri)
