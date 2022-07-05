@@ -8,6 +8,7 @@ import threading
 import Pyro4
 import time
 import hashlib
+from datetime import datetime
 from Accessories.search_type import Search_Type
 
 Pyro4.expose
@@ -58,7 +59,7 @@ class FindFile(object):
     with open(name, write_mode) as file:
         file.write(content)
     
-    hash=hashlib.sha256(name).hexdigest()
+    hash=hashlib.sha256(name+datetime.now()).hexdigest()
     if node.files.count(hash)==0:
      node.files.append(hash)
     if list(node.files_system.keys()).count(hash)==0:
@@ -97,7 +98,7 @@ class FindFile(object):
     with open(name, write_mode) as file:
             file.write(content)
    else:
-              hash_new=hashlib.sha256(name).hexdigest()
+              hash_new=hashlib.sha256(name+datetime.now()).hexdigest()
               node.files_system.setdefault(hash_new,node.files_system.get(hash))    #anadir el nuevo hash junto a la lista de ips donde esta el archivo
               node.files.remove(hash)
               node.files.append(hash_new) ##Anadir el nuevo hash
@@ -211,7 +212,7 @@ class FilesManager(object):
                 ipDondeEsta=node.ip
              
              if content==b"":
-              hash_new=hashlib.sha256(name).hexdigest()
+              hash_new=hashlib.sha256(name+datetime.now()).hexdigest()
               node.files_system.setdefault(hash_new,node.files_system.get(hash_code))    #anadir el nuevo hash junto a la lista de ips donde esta el archivo
               node.files.remove(hash)
               node.files.append(hash_new) ##Anadir el nuevo hash
@@ -311,7 +312,7 @@ class FilesManager(object):
                             return False
                     count+=1
                 try:    
-                    hash=hashlib.sha256(name).hexdigest()
+                    hash=hashlib.sha256(name+datetime.now()).hexdigest()
                     if ip!=node.ip:
                      id=node.node_list.index(ip)
                      uri = "PYRO:FindFile@"+ip+":8013"
