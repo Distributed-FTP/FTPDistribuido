@@ -2,6 +2,7 @@ from pickle import TRUE
 import socket
 import os
 import threading
+from typing_extensions import Self
 import Pyro4
 import time
 
@@ -189,6 +190,7 @@ def run():
     while True:
         if not node.stabilized_system:
             if node.ip_boss == None:
+              if node.leader_calls:
                 node.search_to_boss=True
                 threading.Thread(target=get_signal, args=()).start()
                 threading.Thread(target=search_boss, args=()).start()
