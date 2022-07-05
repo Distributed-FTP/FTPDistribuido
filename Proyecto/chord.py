@@ -1,3 +1,4 @@
+from itertools import count
 from pickle import TRUE
 import socket
 import os
@@ -159,6 +160,7 @@ def create_finger_table():
         node.finger_table.setdefault(key,key)
 
 def run():  
+    count=0
     while True:
         if not node.stabilized_system:
             if node.ip_boss == None and not node.leader_calls:
@@ -191,17 +193,17 @@ def run():
                 else:
                     node.stabilized_system=True
             else:
-
-                if node.stabilized_system:
-                 
-                 while True:
-                 
+                 if count==0:
+                     threading.Thread(target=listen, args=()).start()
+                     count+=1
+                 if node.successor!=None:
                   if not check_ping(node.ip_boss):
                    node.there_boss=False
                    threading.Thread(target=wait_update_boss, args=()).start()
                    threading.Thread(target=get_boss, args=()).start()
-                else:
-                    threading.Thread(target=listen, args=()).start()
+                
+                    
+                    
                                     
 def get_signal():
     Pyro4.Daemon.serveSimple(
