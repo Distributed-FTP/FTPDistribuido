@@ -30,6 +30,7 @@ def server_listener():
 
 if __name__ == "__main__":
     Thread(target=server_listener).start()
+    Thread(target=os.system('python3 chord.py')).start()
     message = input().lower()
     if message == "q":
         listen_sock.close()
