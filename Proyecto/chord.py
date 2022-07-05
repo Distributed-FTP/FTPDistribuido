@@ -1,3 +1,4 @@
+from pickle import TRUE
 import socket
 import os
 import threading
@@ -25,10 +26,21 @@ class Listen(object):
     def leave_message(id):
        node.node_control[id]=False
 
+    def join_to_system(node_control_boss,node_list_boss):
+        node.node_control=node_control_boss
+        node.node_list=node_list_boss
+    
+    def assign_boss(ip_boss):
+        node.ip_boss=ip_boss
+
+    def assign_id():
+      node.id=node.node_list.index(node.ip)
+
     def ping():
         return
 
-    
+    #def update_file_hash(keys,values):### Para Cargar archivos
+         #for key in 
 
 
 @Pyro4.expose
@@ -98,7 +110,7 @@ def run():
             if not node.stabilized_system:
                 if node.ip_boss == None:
                     node.search_to_boss=True
-                    #threading.Thread(target=get_signal, args=()).start()
+                    threading.Thread(target=get_signal, args=()).start()
                     threading.Thread(target=search_boss, args=()).start()
                     
                     while True:
@@ -110,7 +122,7 @@ def run():
                                 node.node_control.append(True)
                                 node.__successor=node.ip
                                 node.__predecessor=node.ip
-                                node.create_finger_table()
+                                create_finger_table()
                                 #self.get_files("Create")
 
                             break
@@ -118,20 +130,20 @@ def run():
                                 node.ip_boss=="temporal"
                                 node.NoSereLider=False
                                 break
-                elif node.ip_boss==node.ip:
-                         
-                          if node.ip_boss==node.ip:                                               
-                           stabilize()
-                           if not update_fingertables_boss():
-                              node.stabilized_system=False
-                           else:
-                            node.stabilized_system=True
+                elif node.ip_boss==node.ip:                                             
+                           while True:
+                             continue
+                           #stabilize()
+                           #if not update_fingertables_boss():
+                           #   node.stabilized_system=False
+                           #else:
+                           # node.stabilized_system=True
                 #elif not check_ping(self.__ip_boss):
                  #   self.there_boss=False
                   #  threading.Thread(target=self.wait_update_boss, args=()).start()
                    # threading.Thread(target=self.get_boss, args=()).start()
-                else:
-                     listen()
+                #else:
+                 #    listen()
                                 
 def get_signal():
 
@@ -250,10 +262,10 @@ def leave(id):
                             print("Otro nodo salio del sistema ,se vera cuando lleguemos a el")
 
 def join(ip):
-        soyNuevo=True
+        SoyNuevo=True
         if node.node_list.count(ip)==1:   #Te estas reconectando           
             node.node_control[node.node_list.index(ip)]=True
-            soyNuevo=False
+            SoyNuevo=False
         else:
             node.node_control.append(True)
             node.node_list.append(ip)
@@ -264,47 +276,38 @@ def join(ip):
         update_successor(predecesor,ip)
         update_predecessor(sucesor,ip)
         
-        #with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-         #   for nodo in self.node_list:            
-          #     if node_control[self.node_list.index(nodo)]:
-           #         try:
-           #             s.connect(nodo,8005)
-            #            s.send(b"JOIN")
-             #           send_list=json.dumps(node_control)
-              #          s.send(b"{}".__format__(send_list.encode('utf-8')))
-               #         send_list=json.dumps(self.node_list)
-                #        s.send(b"{}".__format__(send_list.encode('utf-8')))
-                 #       if soyNuevo:
-                 #           s.send(b"{}".__format__(str(self.node_list.index(ip)).encode('utf-8')))
-                 #       else:
-                 ##           s.send(b"")
-                  #      if nodo==ip:
-                 #           send_list=json.dumps(list(self.files_hash.keys()))
-                 #           s.send(b"{}".__format__(send_list))
-                 #           send_list=json.dumps(list(self.files_hash.values()))
-                #            s.send(b"{}".__format__(send_list))
-#
- #                           if not soyNuevo:
-  #                           s.send(b"Reconectando")
-   #                          
-#
- #                           else:
-  #                           s.send(b"Continue")
-   #                         data=s.recv(1024)
-    #                        while data != "":
-     #                           data=s.recv(1024)
-      #                          keys=json.loads(data)
-       #                         data=s.recv(1024)
-         #                       values=json.loads(data)
-         #                       for i in range(0,len(keys)-1):
-          #                         self.files_hash.setdefault(keys[i],values[i])           
-           #                     data=s.recv(1024)
-            #            else:
-             #               s.send(b"")
+        for nodo in node.node_list:            
+               if node.node_control[node.node_list.index(nodo)]:
+                    try:
+                        uri = "PYRO:Stabilize@"+nodo+":8005"
+                        remote = Pyro4.Proxy(uri)
+                        remote.join_to_system(node.node_control,node.node_list)
+                        remote.assign_boss(node.ip)
+                        remote.assign_id()
+                        #if nodo==ip:
+                           # remote.update_file_hash(list(node.files_hash.keys()),list(node.files_hash.values()))
 
-              #          s.close()
-               #     except:
-                #        print("Otro nodo entro en el sistema ,se vera cuando lleguemos a el")
+                            #if not soyNuevo:
+                             #s.send(b"Reconectando")
+                             
+
+                            #else:
+                            # s.send(b"Continue")
+                            #data=s.recv(1024)
+                            #while data != "":
+                            #    data=s.recv(1024)
+                            #    keys=json.loads(data)
+                            #    data=s.recv(1024)
+                             #   values=json.loads(data)
+                             #   for i in range(0,len(keys)-1):
+                             #      self.files_hash.setdefault(keys[i],values[i])           
+                             #   data=s.recv(1024)
+                       # else:
+                        #    s.send(b"")
+
+                       # s.close()
+                    except:
+                        print("Otro nodo entro en el sistema ,se vera cuando lleguemos a el")
 
 def get_predecessor(ip):
         pos=node.node_list.index(ip)
