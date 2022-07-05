@@ -290,80 +290,80 @@ class FilesManager(object):
     
     def upload(self, name:str, write_mode: str, content: bytes,first:bool):
         if first:
-                ip=None
-                count_files=0
-                count=0
+            ip=None
+            count_files=0
+            count=0
+            for nodo in node.node_list:
+                if node.node_control[count]==True and nodo!=node.ip:
+                    try:
+                        uri = "PYRO:FindFile@"+nodo+":8013"
+                        remote = Pyro4.Proxy(uri)
+                        CantArchivos=remote.cant_archivos()
+                        if count==0:
+                            ip = nodo
+                            count_files=CantArchivos
+                        elif CantArchivos<count_files:
+                            ip = nodo
+                            count_files=CantArchivos
+                    except:
+                        stabilized_system=False
+                        return False
+                count+=1
+            try:    
+                hash=hashlib.sha256(name+datetime.now()).hexdigest()
+                if ip!=node.ip:
+                    id=node.node_list.index(ip)
+                    uri = "PYRO:FindFile@"+ip+":8013"
+                    remote = Pyro4.Proxy(uri)
+                    remote.save_file(id,name,write_mode,content)
+                    id_file_return=id+","+hash                    
+                else:
+                    print("entro")
+                    with open(name, write_mode) as file:
+                        file.write(content)
+                    if node.files.count(hash)==0:
+                        node.files.append(hash)
+                    if list(node.files_system.keys()).count(hash)==0:
+                        node.files_system.setdefault(hash,[])
+                    id_file_return=node.id+","+hash
+                
+                node.files_hash.setdefault(name,id_file_return)
+                
                 for nodo in node.node_list:
-                    if node.node_control[count]==True and nodo!=node.ip:
-                        try:
+                    if nodo!=node.ip:
+                        if node.node_control[node.node_list.index(nodo)]==True:
                             uri = "PYRO:FindFile@"+nodo+":8013"
                             remote = Pyro4.Proxy(uri)
-                            CantArchivos=remote.cant_archivos()
- 
-                            if count==0:
-                                ip = nodo
-                                count_files=CantArchivos
-                            elif CantArchivos<count_files:
-                                ip = nodo
-                                count_files=CantArchivos
-                        except:
-                            stabilized_system=False
-                            return False
-                    count+=1
-                try:    
-                    hash=hashlib.sha256(name+datetime.now()).hexdigest()
-                    if ip!=node.ip:
-                     id=node.node_list.index(ip)
-                     uri = "PYRO:FindFile@"+ip+":8013"
-                     remote = Pyro4.Proxy(uri)
-                     remote.save_file(id,name,write_mode,content)
-                     id_file_return=id+","+hash                    
+                            remote.upload_root(name,id_file_return)
+                                
+                nodes_where_the_file_is=[]    
+                nodes_where_the_file_is.append(ip)
+                count_replicas=3
+                
+                while count_replicas>0:#Replicacion
+                    if ip!=self.ip:
+                        uri = "PYRO:FindFile@"+ip+":8013"
+                        remote = Pyro4.Proxy(uri)
+                        ip=remote.give_me_sucesor()   
                     else:
-                     with open(name, write_mode) as file:
-                            file.write(content)
-                     if node.files.count(hash)==0:
-                        node.files.append(hash)
-                     if list(node.files_system.keys()).count(hash)==0:
-                        node.files_system.setdefault(hash,[])
-                     id_file_return=node.id+","+hash
+                        ip=node.successor
                     
-                    node.files_hash.setdefault(name,id_file_return)
+                    if ip!=node.ip: 
+                        uri = "PYRO:FindFile@"+ip+":8013"
+                        remote = Pyro4.Proxy(uri)
+                        remote.save_file(name,write_mode,content)  
+                        if nodes_where_the_file_is.count(ip)==0:
+                            nodes_where_the_file_is.append(ip)
                     
-                    for nodo in node.node_list:
-                        if nodo!=node.ip:
-                            if node.node_control[node.node_list.index(nodo)]==True:
-                                    uri = "PYRO:FindFile@"+nodo+":8013"
-                                    remote = Pyro4.Proxy(uri)
-                                    remote.upload_root(name,id_file_return)
-                                    
-                    nodes_where_the_file_is=[]    
-                    nodes_where_the_file_is.append(ip)
-                    count_replicas=3
-                    
-                    while count_replicas>0:#Replicacion
-                        if ip!=self.ip:
-                           uri = "PYRO:FindFile@"+ip+":8013"
-                           remote = Pyro4.Proxy(uri)
-                           ip=remote.give_me_sucesor()   
-                        else:
-                          ip=node.successor
+                        count_replicas-=1
                         
-                        if ip!=node.ip: 
+                        for ip in nodes_where_the_file_is:
                             uri = "PYRO:FindFile@"+ip+":8013"
                             remote = Pyro4.Proxy(uri)
-                            remote.save_file(name,write_mode,content)  
-                            if nodes_where_the_file_is.count(ip)==0:
-                             nodes_where_the_file_is.append(ip)
-                        
-                            count_replicas-=1
-                         
-                            for ip in nodes_where_the_file_is:
-                              uri = "PYRO:FindFile@"+ip+":8013"
-                              remote = Pyro4.Proxy(uri)
-                              remote.update_replicas(hash,nodes_where_the_file_is)  
-                except:
-                    stabilized_system=False
-                    return False                   
+                            remote.update_replicas(hash,nodes_where_the_file_is)  
+            except:
+                stabilized_system=False
+                return False                   
     
     def download(self, name:str, read_mode: str):
         file_id=node.files_hash.get(name)
