@@ -191,9 +191,10 @@ def run():
                 else:
                     node.stabilized_system=True
             else:
-                threading.Thread(target=listen, args=()).start()
-                while True:
-                 if node.stabilized_system:
+                if node.stabilized_system:
+                 threading.Thread(target=listen, args=()).start()
+                 while True:
+                 
                   if not check_ping(node.ip_boss):
                    node.there_boss=False
                    threading.Thread(target=wait_update_boss, args=()).start()
