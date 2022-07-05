@@ -1,6 +1,9 @@
 import socket
 import Pyro4
 
+s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+s.connect(("8.8.8.8", 80))
+
 Pyro4.expose
 class RecvBytesforDownload(object):
   def get_bytes(self, bytes):
@@ -10,9 +13,7 @@ Pyro4.Daemon.serveSimple(
     {
        RecvBytesforDownload : "RecvBytesforDownload"
     },
-    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    s.connect(("8.8.8.8", 80))
-    host=s.getsockname()[0]
+    host=s.getsockname()[0],
     port=8014,
     ns=False)
 
@@ -26,7 +27,6 @@ class Directory_Manager():
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         s.connect(("8.8.8.8", 80))
         self.__ip = s.getsockname()[0]
-    
     
     #Directories
     def create_directory(self, directory_name: str):
@@ -165,8 +165,9 @@ class Directory_Manager():
         first = True
         while True:
             bytes_recieved = socket_client.recv(self.__buffer)
-            remote.upload(self.path_default + file_name, read_mode, bytes_recieved)
-                
+            remote.upload(self.path_default + file_name, read_mode, bytes_recieved, first)
+            if first:
+                first = False    
             if bytes_recieved == b'':
                 break    
     
