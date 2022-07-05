@@ -108,3 +108,13 @@ F~~/root/file.txt/
 [2022/07/02 :: 22:34:00]:: Conectando a ('127.0.0.1', 49299)
 ```
 
+### Resumen de implementacion de Chord e interaccion con archivos
+
+El DHT que utilizamos en nuestro proyecto fue chord , con el cual creamos la logica de estabilidad de nuestro sistema. Empezando por la eleccion de lider , escogimos utilizar la estrategia de que un nodo no conozca a el lider cuando se quiere conectar al sistema , el nodo buscara en el rango de la red a la que esta conectada por todos los posibles ips , esto lo hara con una conexion de cliente esperando encontrar un servidor del otro lado, para las conexiones entre nodos utilizamos la libreria Pyro4 , aunque antes utilizamos tambien sockets directamente.Cada nodo cuando se crea creara un Servidor y un cliente por un puerto especifico , el servidor con el objetivo de recibir alguna conexion de otro nodo que se quiera conectar a el y cliente para buscar algun nodo activo, si un nodo encuentra a otro ent le mandara un codigo para poder unirse a la red , si el nodo receptor es el lider entonces guarda el ip del nodo del que recibe la senal , asi como la lista que el nodo que ejerce de cliente encontro(mas adelante explico en que consiste) y le retorna un mensaje para que sepa que encontro al lider y no debe seguir buscando .En caso de que el nodo servidor no sea el lider pero lo conozca este se lo manda para que se conecte directamente al lider y pase el procedimiento explicado anteriormente.En caso de que un nodo se encuentre con otro nodo que no tiene lider el nodo encontrado se anade a una lista de nodos encontrados del nodo que lo encontro y de esta forma o siempre hay un lider o los nodos saben armar un sistema y escoger al lider.
+
+Otro tema importante es la estabilidad , el lider es quien se encarga de comprobar la conexion de los nodos del sistema periodicamente y como ya dijimos antes es quien une al sistema los nodos que quieren conectarse ,asi como le avisa a los demas nodos del sistema algun nodo se desconecta del sistema.El lider mantiene actualizada la informacion de los demas nodos y sus finguertables. Los nodos que no son lider constantemente estan dando ping al lider , si el lider se cae ent el lider sera el nodo del sistema que menor id tenga.
+
+En cuanto a los archivos cuando vamos a subir uno al servidor FTP,
+
+
+
