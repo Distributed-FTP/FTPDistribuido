@@ -13,14 +13,18 @@ from Accessories.search_type import Search_Type
 Pyro4.expose
 class UpdateDirectoriesManager(object):
   
-  def create_directory(self,root):
-    os.mkdir(root)
+    def create_directory(self,root):
+        os.mkdir(root)
 
-  def change_name_directory(self,root,new_name):
-    os.rename(root,new_name)
+    def change_name_directory(self,root,new_name):
+        os.rename(root,new_name)
 
-  def delete_directory(self,root):
-    os.rmdir(root)
+    def delete_directory(self,root):
+        os.rmdir(root)
+    
+    def update_data_file(self,root,data):
+        with open(root, 'w') as f:
+            f.write(data)
 
 @Pyro4.expose
 class FindFile(object):
@@ -388,57 +392,50 @@ class FilesManager(object):
     
 @Pyro4.expose
 class DirectoriesManager(object):
-    @property
-    def create_property(self, name:str):
+    def create_directory(self, name:str, db_root:str, db_data:str):
         os.mkdir(name)
-        
-    @property
-    def delete_property(self, name:str):
-        os.rmdir(name)
-        
-    @property
-    def rename_property(self, name:str, new_name:str):
-        os.rename(name, new_name)
-    
-    @property
-    def state_property(self, name:str):
-        return os.stat(name)
-    
-    def create_directory(self,name:str):
-        self.create_property(name)
+        with open(db_root, 'w') as f:
+            f.write(db_data)
         for nodo in node.node_list:
             if node.node_control[node.node_list.index(nodo)] and node.ip!=nodo:
                 try:
                     uri = "PYRO:UpdateDirectoriesManager@"+nodo+":8012"
                     remote = Pyro4.Proxy(uri)
                     remote.create_directory(name)
+                    remote.update_data_file(db_root, db_data)
                 except:
                     None
 
-    def change_name_directory(self,name,new_name):
-        self.rename_property(name)
+    def change_name_directory(self, name:str, new_name:str, db_root:str, db_data:str):
+        os.rename(name, new_name)
+        with open(db_root, 'w') as f:
+            f.write(db_data)
         for nodo in node.node_list:
             if node.node_control[node.node_list.index(nodo)] and node.ip!=nodo:
                 try:
                     uri = "PYRO:UpdateDirectoriesManager@"+nodo+":8012"
                     remote = Pyro4.Proxy(uri)
                     remote.change_name_directory(name,new_name)
+                    remote.update_data_file(db_root, db_data)
                 except:
                     None
          
-    def delete_directory(self,name):
-        self.delete_property(name)
+    def delete_directory(self, name:str, db_root:str, db_data:str):
+        os.rmdir(name)
+        with open(db_root, 'w') as f:
+            f.write(db_data)
         for nodo in node.node_list:
             if node.node_control[node.node_list.index(nodo)] and node.ip!=nodo:
                 try:
                     uri = "PYRO:UpdateDirectoriesManager@"+nodo+":8012"
                     remote = Pyro4.Proxy(uri)
                     remote.delete_directory(name)
+                    remote.update_data_file(db_root, db_data)
                 except:
                     None
 
     def state_directory(self,name):
-        return self.state_property(name)
+        return os.stat(name)
 
 
 @Pyro4.expose
