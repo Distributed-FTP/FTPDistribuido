@@ -192,15 +192,16 @@ def run():
                     node.stabilized_system=False
                 else:
                     node.stabilized_system=True
-            else:
-                 if count==0 :
+            elif count==0 :
                      threading.Thread(target=listen, args=()).start()
                      threading.Thread(target=wait_update_boss, args=()).start()
+                     time.sleep(2)
                      count+=1
-                 if len(node.node_list)>0 :
-                  if not check_ping():
-                   node.there_boss=False
-                   threading.Thread(target=get_boss, args=()).start()
+            else:     
+                  if node.ip_boss!=None:
+                   if not check_ping():
+                    node.there_boss=False
+                    threading.Thread(target=get_boss, args=()).start()
                 
                     
                     
