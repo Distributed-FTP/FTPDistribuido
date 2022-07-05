@@ -191,14 +191,17 @@ def run():
                 else:
                     node.stabilized_system=True
             else:
+
                 if node.stabilized_system:
-                 threading.Thread(target=listen, args=()).start()
+                 
                  while True:
                  
                   if not check_ping(node.ip_boss):
                    node.there_boss=False
                    threading.Thread(target=wait_update_boss, args=()).start()
                    threading.Thread(target=get_boss, args=()).start()
+                else:
+                    threading.Thread(target=listen, args=()).start()
                                     
 def get_signal():
     Pyro4.Daemon.serveSimple(
