@@ -9,31 +9,31 @@ from utils import get_proxy
 
 @Pyro4.expose
 class Listen(object):
-    def update_predecesor(predecesor):
+    def update_predecesor(self,predecesor):
         node.predecessor=predecesor
 
-    def update_sucesor(sucesor):
+    def update_sucesor(self,sucesor):
         node.successor=sucesor
 
-    def update_fingetables():
+    def update_fingetables(self):
         for i in range(0,8):
             id=pow(2,i)+node.id
             node.finger_table[id]=node.give_me_sucesor(id)
 
-    def leave_message(id):
+    def leave_message(self,id):
        node.node_control[id]=False
 
-    def join_to_system(node_control_boss,node_list_boss):
+    def join_to_system(self,node_control_boss,node_list_boss):
         node.node_control=node_control_boss
         node.node_list=node_list_boss
     
-    def assign_boss(ip_boss):
+    def assign_boss(self,ip_boss):
         node.ip_boss=ip_boss
 
-    def assign_id():
+    def assign_id(self):
       node.id=node.node_list.index(node.ip)
 
-    def ping():
+    def ping(self):
         return
 
     #def update_file_hash(keys,values):### Para Cargar archivos
