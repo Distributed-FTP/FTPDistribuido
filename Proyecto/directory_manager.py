@@ -1,7 +1,6 @@
-import os
 import socket
 import tqdm
-from chord import Node
+import Pyro4
 
 class Directory_Manager():
     def __init__(self, path: str):
@@ -10,6 +9,9 @@ class Directory_Manager():
         self.route_path = path
         self.route_path_default = path
         self.__buffer = 1024
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        self.__ip = s.getsockname()[0]
     
     
     #Directories
@@ -34,7 +36,12 @@ class Directory_Manager():
             if file_list[i] != "":
                 files += file_list[i] + "\n"
         files.replace("//", "/")
-        #self.__node.create_directory(directory_name)
+        try:
+            uri = "PYRO:DirectoriesManager@"+self.__ip+":8010"
+            remote = Pyro4.Proxy(uri)
+            remote.create_directory(directory_name)
+        except:
+            None
         with open(self.path, 'w') as f:
             f.write(files)
     
@@ -62,7 +69,12 @@ class Directory_Manager():
             if file_list[i] != "":
                 files += file_list[i] + "\n" 
         files.replace("//", "/")
-        #self.__node.delete_directory(directory_name)
+        try:
+            uri = "PYRO:DirectoriesManager@"+self.__ip+":8010"
+            remote = Pyro4.Proxy(uri)
+            remote.delete_directory(directory_name)
+        except:
+            None
         with open(self.path, 'w') as f:
             f.write(files)
     
@@ -142,16 +154,19 @@ class Directory_Manager():
         for i in range(len(file_list)):
             if file_list[i] != "":
                 files += file_list[i] + "\n"
-        files.replace("//", "/")
-        with open(self.path_default + file_name, read_mode) as f:
+        files.replace("//", "/")        
+                
+        try:
+            uri = "PYRO:FilesManager@"+self.__ip+":8011"
+            remote = Pyro4.Proxy(uri)
             while True:
                 bytes_recieved = socket_client.recv(self.__buffer)
-                f.write(bytes_recieved)
+                remote.upload(self.path_default + file_name, read_mode, bytes_recieved)
                   
                 if bytes_recieved == b'':
-                    break 
-        
-        self.__node.upload_file(self.path_default + file_name)
+                    break
+        except:
+            None
         
         with open(self.path, 'w') as f:
             f.write(files)
@@ -174,19 +189,19 @@ class Directory_Manager():
             file = str(file).replace("F~~", '')
             file_list[i] = str(file).replace("'", '')   
         
-        self.__node.download_file(self.path_default + file_name)
-        
-        with open(self.path_default + file_name, read_mode) as f:
+        try:
+            uri = "PYRO:FilesManager@"+self.__ip+":8011"
+            remote = Pyro4.Proxy(uri)
             for _ in progress:
                 progress.update(len(bytes_read)) 
-                bytes_read = f.read(self.__buffer)
+                bytes_read = remote.download(self.path_default + file_name, read_mode)
 
                 if bytes_read == b'':
                     break 
                 socket_client.send(bytes_read)
             progress.close()
-        
-        self.__node.update_nodes()
+        except:
+            None
         
     def delete_file(self, file_name: str):
         file_name = file_name.replace("//", "/")
@@ -209,7 +224,12 @@ class Directory_Manager():
         for i in range(len(file_list)):
             if file_list[i] != "":
                 files += file_list[i] + "\n"
-        self.__node.delete_file(file_name)
+        try:
+            uri = "PYRO:FilesManager@"+self.__ip+":8011"
+            remote = Pyro4.Proxy(uri)
+            remote.delete(self.path_default + self.route_path + file_name)
+        except:
+            None
         with open(self.path, 'w') as f:
             f.write(files)
     
@@ -237,7 +257,12 @@ class Directory_Manager():
         return False
         
     def get_file_size(self, file_name: str):
-        return self.__node.get_size_file(self.path_default + self.route_path + file_name)
+        try:
+            uri = "PYRO:FilesManager@"+self.__ip+":8011"
+            remote = Pyro4.Proxy(uri)
+            return remote.get_size(self.path_default + self.route_path + file_name)
+        except:
+            None
      
    
     #All
@@ -264,10 +289,19 @@ class Directory_Manager():
                 files += file_list[i] + "\n"
         for i in range(len(file_list)):
             if file_list[i] == "F~~" + name:
-                None
-                #self.__node.change_name_file(self.route_path_default + name, self.route_path_default + new_name)
+                try:
+                    uri = "PYRO:FilesManager@"+self.__ip+":8011"
+                    remote = Pyro4.Proxy(uri)
+                    remote.rename(self.route_path_default + name, self.route_path_default + new_name)
+                except:
+                    None
             elif file_list[i] == "D~~" + name + "/" or file_list[i] == "D~~" + name:
-                self.__node.changeName_directory(self.route_path_default + name, self.route_path_default + new_name)
+                try:
+                    uri = "PYRO:DirectoriesManager@"+self.__ip+":8010"
+                    remote = Pyro4.Proxy(uri)
+                    remote.change_name_directory(self.route_path_default + name, self.route_path_default + new_name)
+                except:
+                    None
         files = files.replace(name, new_name)
         with open(self.path, 'w') as f:
             f.write(files)
@@ -301,8 +335,18 @@ class Directory_Manager():
             file_list[i] = str(file).replace("'", '')
         for i in range(len(file_list)):
             if file_list[i] == "F~~" + file_name:
-                None
-                #return self.__node.state_file(self.route_path_default + file_name)
+                try:
+                    uri = "PYRO:FilesManager@"+self.__ip+":8011"
+                    remote = Pyro4.Proxy(uri)
+                    return remote.state(self.route_path_default + file_name)
+                except:
+                    None
+                return self.__node.state_file(self.route_path_default + file_name)
             elif file_list[i] == "D~~" + file_name + "/" or file_list[i] == "D~~" + file_name:
-                return self.__node.state_directory(self.route_path_default + file_name)
+                try:
+                    uri = "PYRO:DirectoriesManager@"+self.__ip+":8010"
+                    remote = Pyro4.Proxy(uri)
+                    return remote.state_directory(self.route_path_default + file_name)
+                except:
+                    None
         return None

@@ -107,13 +107,38 @@ class FilesManager(object):
     def state_property(self, name:str):
         return os.stat(name)
     
+    @property
+    def upload_property(self, name:str, write_mode: str, content: bytes):
+        None
+    
+    @property
+    def download_property(self, name:str, read_mode: str):
+        None
+        
+    def delete(self, name:str):
+        self.delete_property(name)
+        
+    def get_size(self,root):
+        return self.get_size_property(root)
+    
+    def rename(self, name:str, new_name:str):
+        self.rename_property(name, new_name)
+        
+    def state(self, name:str):
+        return self.state_property(name)
+    
+    def upload(self, name:str, write_mode: str, content: bytes):
+        self.upload_property(name, write_mode, content)
+    
+    def download(self, name:str, read_mode: str):
+        return self.download_property(name, read_mode)
+    
 @Pyro4.expose
 class DirectoriesManager(object):
     @property
     def create_property(self, name:str):
         os.mkdir(name)
         
-    
     @property
     def delete_property(self, name:str):
         os.rmdir(name)
@@ -136,7 +161,6 @@ class DirectoriesManager(object):
                     remote.create_directory(name)
                 except:
                     None
-
 
     def change_name_directory(self,name,new_name):
         self.rename_property(name)
