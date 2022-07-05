@@ -161,6 +161,7 @@ def create_finger_table():
 
 def run():  
     count=0
+    
     while True:
         if not node.stabilized_system:
             if node.ip_boss == None and not node.leader_calls:
@@ -198,10 +199,11 @@ def run():
                      time.sleep(2)
                      count+=1
             else:     
-                  if node.ip_boss!=None:
+                  if node.ip_boss!=None and node.there_boss:
                    if not check_ping():
                     node.there_boss=False
                     threading.Thread(target=get_boss, args=()).start()
+                    
                 
                     
                     
