@@ -3,7 +3,6 @@ import socket
 from threading import Thread
 import time
 import sys
-from tqdm import tqdm
 from directory_manager import Directory_Manager
 from Accessories.return_codes import Return_Codes
 from Accessories.log import Log
@@ -563,8 +562,7 @@ class ServerFTP(Thread):
         readmode = 'rb' if  self.type == 'I' else 'r'
 
         try:
-            progress = tqdm(range(filesize), desc="Descargando...", unit="B", unit_scale=True, unit_divisor=self.__buffer)
-            self.directory_manager.download_file(filename, readmode, self.data_connection, progress)
+            self.directory_manager.download_file(filename, readmode, self.data_connection)
             
             self.__send_control(Return_Codes.Code_226().encode())
             self.log.LogOk(self.control_address[0], self.control_address[1], f"El usuario {self.__user} ha descargado el archivo {filename}.")

@@ -1,5 +1,4 @@
 import socket
-import tqdm
 import Pyro4
 
 class Directory_Manager():
@@ -171,7 +170,7 @@ class Directory_Manager():
         with open(self.path, 'w') as f:
             f.write(files)
     
-    def download_file(self, file_name: str, read_mode: str, socket_client: socket.socket, progress: tqdm):
+    def download_file(self, file_name: str, read_mode: str, socket_client: socket.socket):
         file_name = file_name.replace("//", "/")
         file_name = self.route_path + file_name
         files = ""
@@ -192,14 +191,12 @@ class Directory_Manager():
         try:
             uri = "PYRO:FilesManager@"+self.__ip+":8011"
             remote = Pyro4.Proxy(uri)
-            for _ in progress:
-                progress.update(len(bytes_read)) 
+            while True:
                 bytes_read = remote.download(self.path_default + file_name, read_mode)
 
                 if bytes_read == b'':
                     break 
                 socket_client.send(bytes_read)
-            progress.close()
         except:
             None
         
