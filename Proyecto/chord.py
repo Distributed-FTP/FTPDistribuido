@@ -10,13 +10,13 @@ import time
 Pyro4.expose
 class UpdateDirectoriesManager(object):
   
-  def create_directory(root):
+  def create_directory(self,root):
     os.mkdir(root)
 
-  def change_name_directory(root,new_name):
+  def change_name_directory(self,root,new_name):
     os.rename(root,new_name)
 
-  def delete_directory(root):
+  def delete_directory(self,root):
     os.rmdir(root)
 
 
@@ -114,42 +114,7 @@ class FilesManager(object):
         None
         
     def delete(self, root:str):
-        file_id=node.files_hash.get(root)
-        
-        for nodo in node.node_list: 
-            if nodo!=node.ip:
-                if node.node_control[node.node_list.index(nodo)]==True:
-                    s.connect(nodo,8008)
-                    s.send("DELETE")
-                    s.send(root)
-                    s.close
-       
-       self.files_hash.pop(root)
-
-       hash_code = file_id
-       id=""
-       while hash_code[0]!=",":
-            id+=hash_code[0]
-            hash_code=hash_code[1:len(hash_code)-1]
-       hash_code=hash_code[1:len(hash_code)-1]
-
-       if self.__files.count(hash)==1:
-              os.remove(root)               
-              self.__files.remove(hash)
-              for nodo in self.__files_system.get(hash):
-                  if nodo!=self.__ip:
-                    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s: 
-                          s.connect(nodo,8008)
-                          s.send(b"DELETE REPLICA")
-                          s.send("{}".format(str(id)))
-                          s.send("{}".format(hash))
-                          s.send("{}".format(root))
-                          s.close()
-                     
-       else:
-         self.find_file(hash_code, None, id, Search_Type.DELETE,root)
-        
-        self.delete_property(name)
+        self.delete_property(root)
         
     def get_size(self,root):
         return self.get_size_property(root)
