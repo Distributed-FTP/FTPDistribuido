@@ -7,8 +7,6 @@ import threading
 import Pyro4
 import time
 
-from utils import get_proxy
-
 Pyro4.expose
 class UpdateDirectoriesManager(object):
   
@@ -516,7 +514,6 @@ def get_boss():
     if not node.there_boss:
         node.ip_boss = node.ip
 
-
 def wait_update_boss():
     Pyro4.Daemon.serveSimple(
     {
@@ -551,10 +548,10 @@ def createServer():
     port=8012,
     ns=False)
 
-     
-s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-s.connect(("8.8.8.8", 80))
-ip_server = s.getsockname()[0]
-node=Node(ip_server,os.getcwd())
-createServer()
-run()
+if __name__ == "__main__":  
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    s.connect(("8.8.8.8", 80))
+    ip_server = s.getsockname()[0]
+    node=Node(ip_server,os.getcwd())
+    createServer()
+    run()

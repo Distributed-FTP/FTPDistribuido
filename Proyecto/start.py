@@ -1,7 +1,5 @@
 import os
-import socket, sys
-import time
-from chord import Node
+import socket
 from directory_manager import Directory_Manager
 from ftp import ServerFTP
 from Accessories.log import Log
@@ -31,8 +29,7 @@ def server_listener():
         f.start()
 
 if __name__ == "__main__":
-    listener = Thread(target=server_listener)
-    listener.start( )
+    Thread(target=server_listener).start()
     message = input().lower()
     if message == "q":
         listen_sock.close()
