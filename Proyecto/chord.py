@@ -1,5 +1,6 @@
 from itertools import count
 from pickle import TRUE
+from platform import node
 import socket
 import os
 import threading
@@ -7,6 +8,19 @@ import Pyro4
 import time
 
 from utils import get_proxy
+
+Pyro4.expose
+class UpdateDirectoriesManager(object):
+  
+  def create_directory(root):
+    os.mkdir(root)
+
+  def change_name_directory(root,new_name):
+    os.rename(root,new_name)
+
+  def delete_directory(root):
+    os.rmdir(root)
+
 
 @Pyro4.expose
 class Listen(object):
@@ -74,6 +88,7 @@ class ResultConnection(object):
         return
 
 
+
 @Pyro4.expose
 class FilesManager(object):
     @property
@@ -97,6 +112,7 @@ class DirectoriesManager(object):
     @property
     def create_property(self, name:str):
         os.mkdir(name)
+        
     
     @property
     def delete_property(self, name:str):
@@ -112,15 +128,41 @@ class DirectoriesManager(object):
     
     def create_directory(self,name:str):
         self.create_property(name)
+        for nodo in node.node_list:
+            if node.node_control[node.node_list.index(nodo)] and node.ip!=nodo:
+                try:
+                    uri = "PYRO:UpdateDirectoriesManager@"+nodo+":8012"
+                    remote = Pyro4.Proxy(uri)
+                    remote.create_directory(name)
+                except:
+                    None
+
 
     def change_name_directory(self,name,new_name):
         self.rename_property(name)
+        for nodo in node.node_list:
+            if node.node_control[node.node_list.index(nodo)] and node.ip!=nodo:
+                try:
+                    uri = "PYRO:UpdateDirectoriesManager@"+nodo+":8012"
+                    remote = Pyro4.Proxy(uri)
+                    remote.change_name_directory(name,new_name)
+                except:
+                    None
          
     def delete_directory(self,name):
         self.delete_property(name)
+        for nodo in node.node_list:
+            if node.node_control[node.node_list.index(nodo)] and node.ip!=nodo:
+                try:
+                    uri = "PYRO:UpdateDirectoriesManager@"+nodo+":8012"
+                    remote = Pyro4.Proxy(uri)
+                    remote.delete_directory(name)
+                except:
+                    None
 
     def state_directory(self,name):
         return self.state_property(name)
+
 
 @Pyro4.expose
 class Node:
@@ -460,10 +502,35 @@ def wait_update_boss():
     port=8002,
     ns=False)  
         
-   
+def createServer():
+    Pyro4.Daemon.serveSimple(
+    {
+       DirectoriesManager : "DirectoriesManager"
+    },
+    host=node.ip,
+    port=8010,
+    ns=False)
+
+    Pyro4.Daemon.serveSimple(
+    {
+       FilesManager : "FilesManager"
+    },
+    host=node.ip,
+    port=8011,
+    ns=False)
+
+    Pyro4.Daemon.serveSimple(
+    {
+       UpdateDirectoriesManager : "UpdateDirectoriesManager"
+    },
+    host=node.ip,
+    port=8012,
+    ns=False)
+
      
 s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 s.connect(("8.8.8.8", 80))
 ip_server = s.getsockname()[0]
 node=Node(ip_server,os.getcwd())
+createServer()
 run()
