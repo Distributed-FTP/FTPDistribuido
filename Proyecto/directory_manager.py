@@ -1,6 +1,20 @@
 import socket
 import Pyro4
 
+Pyro4.expose
+class RecvBytesforDownload(object):
+  def 
+
+Pyro4.Daemon.serveSimple(
+    {
+       RecvBytesforDownload : "RecvBytesforDownload"
+    },
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    s.connect(("8.8.8.8", 80))
+    host=s.getsockname()[0]
+    port=8014,
+    ns=False)
+
 class Directory_Manager():
     def __init__(self, path: str):
         self.path = path + "/Reports/files.fl"

@@ -517,11 +517,7 @@ def run():
                     if not check_ping() :
                         node.there_boss=False
                         threading.Thread(target=get_boss, args=()).start()
-                    
-                
-                    
-                    
-                                    
+                                                
 def get_signal():
     Pyro4.Daemon.serveSimple(
     {
