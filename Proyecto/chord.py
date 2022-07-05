@@ -15,7 +15,7 @@ from Accessories.search_type import Search_Type
 class UpdateDirectoriesManager(object):
     def create_directory(self,root):
         print("Creating directory: " + root)
-        os.mkdir(os.path.basename() + root)
+        os.mkdir(os.getcwd() + root)
 
     def change_name_directory(self,root,new_name):
         os.rename(root,new_name)
@@ -24,7 +24,7 @@ class UpdateDirectoriesManager(object):
         os.rmdir(root)
     
     def update_data_file(self,data):
-        with open(os.path.dirname() + "/Reports/files.fl", 'w') as f:
+        with open(os.getcwd() + "/Reports/files.fl", 'w') as f:
             f.write(data)
 
 @Pyro4.expose
