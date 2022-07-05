@@ -43,8 +43,6 @@ add_pass <Password>: Añade contraseña a un nombre de usuario insertado antes
 remove_user <Username>: Elimina nombre de usuario y su contraseña
 ```
 
-## **[chord.py](https://github.com/Distributed-FTP/FTPDistribuido/blob/master/Proyecto/chord.py)**
-La clase Chord contiene las tallas turbias de Chord....
 
 ## **Comandos implementados**
 Login | Logout | Parámetros de transferencia | Acciones sobre ficheros | Ordenes informativas | Otras órdenes
