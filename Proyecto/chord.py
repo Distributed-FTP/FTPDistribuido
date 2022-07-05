@@ -341,12 +341,25 @@ def join(ip):
         node.node_control.append(True)
         node.node_list.append(ip)
     sucesor=get_successor(ip)
-    predecesor=get_predecessor(ip)
-    update_successor(ip,sucesor)
-    update_predecessor(ip,predecesor)
-    update_successor(predecesor,ip)
-    update_predecessor(sucesor,ip)
+    predecesor=get_predecessor(ip)   
+    if ip!=node.ip:    
+     update_successor(ip,sucesor)
+     update_predecessor(ip,predecesor)
+    else:
+      node.sucessor=sucesor
+      node.predecessor=predecesor
     
+    if predecesor!=node.ip:
+     update_successor(predecesor,ip)
+    else:
+     node.sucessor=ip
+    
+    if sucesor!=node.ip:
+     update_predecessor(sucesor,ip)
+    else:
+      node.predecessor=ip
+      
+
     for nodo in node.node_list:            
         if node.node_control[node.node_list.index(nodo)]:
             try:
