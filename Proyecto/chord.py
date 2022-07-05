@@ -133,24 +133,8 @@ class FilesManager(object):
     
 @Pyro4.expose
 class DirectoriesManager(object):
-    @property
-    def create_property(self, name:str):
-        os.mkdir(name)
-        
-    @property
-    def delete_property(self, name:str):
-        os.rmdir(name)
-        
-    @property
-    def rename_property(self, name:str, new_name:str):
-        os.rename(name, new_name)
-    
-    @property
-    def state_property(self, name:str):
-        return os.stat(name)
-    
     def create_directory(self,name:str):
-        self.create_property(name)
+        os.mkdir(name)
         for nodo in node.node_list:
             if node.node_control[node.node_list.index(nodo)] and node.ip!=nodo:
                 try:
@@ -161,7 +145,7 @@ class DirectoriesManager(object):
                     None
 
     def change_name_directory(self,name,new_name):
-        self.rename_property(name)
+        os.rename(name, new_name)
         for nodo in node.node_list:
             if node.node_control[node.node_list.index(nodo)] and node.ip!=nodo:
                 try:
@@ -172,7 +156,7 @@ class DirectoriesManager(object):
                     None
          
     def delete_directory(self,name):
-        self.delete_property(name)
+        os.rmdir(name)
         for nodo in node.node_list:
             if node.node_control[node.node_list.index(nodo)] and node.ip!=nodo:
                 try:
@@ -183,7 +167,7 @@ class DirectoriesManager(object):
                     None
 
     def state_directory(self,name):
-        return self.state_property(name)
+        return os.stat(name)
 
 
 @Pyro4.expose

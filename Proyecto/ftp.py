@@ -191,10 +191,10 @@ class ServerFTP(Thread):
         fullmode='rwxrwxrwx'
         mode=''
         for i in range(9):
-            mode+=((st.st_mode>>(8-i))&1) and fullmode[i] or '-'
+            mode+=((st[0]>>(8-i))&1) and fullmode[i] or '-'
         d=(self.directory_manager.is_directory(fname)) and 'd' or '-'
-        ftime=time.strftime(' %b %d %H:%M ', time.gmtime(st.st_mtime))
-        return d+mode+' 1 user group '+str(st.st_size)+ftime+self.directory_manager.basename(fname)+'\r\n'
+        ftime=time.strftime(' %b %d %H:%M ', time.gmtime(st[8]))
+        return d+mode+' 1 user group '+str(st[6])+ftime+self.directory_manager.basename(fname)+'\r\n'
 
 
     '''
