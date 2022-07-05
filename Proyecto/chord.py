@@ -42,27 +42,24 @@ class Listen(object):
 
 @Pyro4.expose
 class ResultConnection(object):
-  
-  def give_me_nodos_encontrados(self):
-    return node.NodosEncontrados
+    def give_me_nodos_encontrados(self):
+        return node.NodosEncontrados
 
-  def give_me_ip_boss(self):
-    return node.ip
-    
+    def give_me_ip_boss(self):
+        return node.ip
 
-  def return_orden(self,message,ip_cliente,NodosEncontradosPorEl):
+    def return_orden(self,message,ip_cliente,NodosEncontradosPorEl):
         if message=="Code #399#":
-                if node.ip==node.ip_boss:
-                    node.NodosEncontrados.append(ip_cliente)
-                    node.NodosEncontrados.extend(NodosEncontradosPorEl)
-                    return 'Code #400#'
-
-                elif node.ip_boss==None:
-                    node.NodosEncontrados.append(node.ip)
-                    node.NoSereLider=True
-                    return "Nodo aislado"
-                else:
-                     return "Code #398#" 
+            if node.ip==node.ip_boss:
+                node.NodosEncontrados.append(ip_cliente)
+                node.NodosEncontrados.extend(NodosEncontradosPorEl)
+                return 'Code #400#'
+            elif node.ip_boss==None:
+                node.NodosEncontrados.append(node.ip)
+                node.NoSereLider=True
+                return "Nodo aislado"
+            else:
+                return "Code #398#" 
 
 
 
@@ -176,80 +173,74 @@ class Node:
         return self.state_directory_property(name)
 
     def give_me_sucesor(self, id):
-      pos=id+1
-      if pos>=len(self.node_list):
-          pos=0
-      while self.node_control[pos]!=True and pos!=id:
-          pos+=1
-      return pos
+        pos=id+1
+        if pos>=len(self.node_list):
+            pos=0
+        while self.node_control[pos]!=True and pos!=id:
+            pos+=1
+        return pos
 
 def create_finger_table():
-        for i in range(8):
-            key=node.id+pow(2,i)
-            node.finger_table.setdefault(key,key)
+    for i in range(8):
+        key=node.id+pow(2,i)
+        node.finger_table.setdefault(key,key)
 
 def run():  
-        while True:
-            if not node.stabilized_system:
-                if node.ip_boss == None:
-                    node.search_to_boss=True
-                    threading.Thread(target=get_signal, args=()).start()
-                    threading.Thread(target=search_boss, args=()).start()
-                    
-                    while True:
-                        if node.search_to_boss==False:
-                            if not node.leader_calls:
-                                node.ip_boss=node.ip
-                                node.id=0
-                                node.node_list.append(node.ip)
-                                node.node_control.append(True)
-                                node.__successor=node.ip
-                                node.__predecessor=node.ip
-                                create_finger_table()
-                                #self.get_files("Create")
+    while True:
+        if not node.stabilized_system:
+            if node.ip_boss == None:
+                node.search_to_boss=True
+                threading.Thread(target=get_signal, args=()).start()
+                threading.Thread(target=search_boss, args=()).start()
+                
+                while True:
+                    if node.search_to_boss==False:
+                        if not node.leader_calls:
+                            node.ip_boss=node.ip
+                            node.id=0
+                            node.node_list.append(node.ip)
+                            node.node_control.append(True)
+                            node.__successor=node.ip
+                            node.__predecessor=node.ip
+                            create_finger_table()
+                            #self.get_files("Create")
 
-                            break
-                        elif node.NoSereLider==True:
-                                node.ip_boss=="temporal"
-                                node.NoSereLider=False
-                                break
-                elif node.ip_boss==node.ip:                                                      
-                           countdown(200)
-                           stabilize()
-                           if not update_fingertables_boss():
-                              node.stabilized_system=False
-                           else:
-                            node.stabilized_system=True
-                #elif not check_ping(self.__ip_boss):
-                 #   self.there_boss=False
-                  #  threading.Thread(target=self.wait_update_boss, args=()).start()
-                   # threading.Thread(target=self.get_boss, args=()).start()
+                        break
+                    elif node.NoSereLider==True:
+                        node.ip_boss=="temporal"
+                        node.NoSereLider=False
+                        break
+            elif node.ip_boss==node.ip:                                                      
+                countdown(200)
+                stabilize()
+                if not update_fingertables_boss():
+                    node.stabilized_system=False
                 else:
-                     listen()
+                    node.stabilized_system=True
+            #elif not check_ping(self.__ip_boss):
+                #   self.there_boss=False
+                #  threading.Thread(target=self.wait_update_boss, args=()).start()
+                # threading.Thread(target=self.get_boss, args=()).start()
+            else:
+                listen()
                                 
 def get_signal():
-
-        Pyro4.Daemon.serveSimple(
-        {
-            ResultConnection: "Stabilize"
-        },
-
-        host=node.ip,
-        port=8003,
-        ns=False
-    )                     
+    Pyro4.Daemon.serveSimple(
+    {
+        ResultConnection: "Connection"
+    },
+    host=node.ip,
+    port=8003,
+    ns=False)                     
 
 def listen():
-
-        Pyro4.Daemon.serveSimple(
-        {
-            Listen: "Stabilize"
-        },
-
-        host=node.ip,
-        port=8005,
-        ns=False
-    )             
+    Pyro4.Daemon.serveSimple(
+    {
+        Listen: "Stabilize"
+    },
+    host=node.ip,
+    port=8005,
+    ns=False)             
 
 def search_boss():
     ip=node.ip
@@ -257,66 +248,64 @@ def search_boss():
         ip=ip[0:len(ip)-1]
 
     for i in range(62,63):
-            uri = "PYRO:Stabilize@"+ip+str(i)+":8003"
-            if node.NoSereLider==True:
-                node.search_to_boss=False
-                break
-            if node.NodosEncontrados.count(ip+str(i))==0 and ip+str(i)!=node.ip:  
-                try:
-                    remote = Pyro4.Proxy(uri)
-                    data=remote.return_orden("Code #399#",node.ip,node.NodosEncontrados)
-                    if data=="Code #400#":
-                        node.leader_calls=True
-                        i=255
-                    elif data=="Nodo aislado":
-                          node.NodosEncontrados.extend(remote.give_me_nodos_encontrados())
-                    elif data=="Code #398":
-                            ip_boss=remote.give_me_ip_boss()
-                            uri = "PYRO:Stabilize@"+ip_boss+":8003"
-                            remote = Pyro4.Proxy(uri)
-                            result=remote.return_orden("Code #399#",node.ip,node.NodosEncontrados)                            
-                except:
-
-                    continue
-    
-        
+        uri = "PYRO:Connection@"+ip+str(i)+":8003"
+        if node.NoSereLider==True:
+            node.search_to_boss=False
+            break
+        if node.NodosEncontrados.count(ip+str(i))==0 and ip+str(i)!=node.ip:  
+            try:
+                remote = Pyro4.Proxy(uri)
+                data=remote.return_orden("Code #399#",node.ip,node.NodosEncontrados)
+                if data=="Code #400#":
+                    node.leader_calls=True
+                    #i=255
+                    break
+                elif data=="Nodo aislado":
+                        node.NodosEncontrados.extend(remote.give_me_nodos_encontrados())
+                elif data=="Code #398":
+                        ip_boss=remote.give_me_ip_boss()
+                        uri = "PYRO:Stabilize@"+ip_boss+":8003"
+                        remote = Pyro4.Proxy(uri)
+                        result=remote.return_orden("Code #399#",node.ip,node.NodosEncontrados)                            
+            except:
+                continue
     node.search_to_boss=False  
 
 def update_fingertables_boss():
     for nodo in node.node_list:
         if nodo!=node.ip: 
             if node.node_control[node.node_list.index(nodo)]:
-              try:
-                uri = "PYRO:Stabilize@"+nodo+":8005"
-                remote = Pyro4.Proxy(uri)
-                remote.update_fingetables()
-              except:
-                return False
+                try:
+                    uri = "PYRO:Stabilize@"+nodo+":8005"
+                    remote = Pyro4.Proxy(uri)
+                    remote.update_fingetables()
+                except:
+                    return False
 
 def stabilize():
-        first_node_active=Node
-        for nodo in node.node_list:
-            if nodo != node.ip:
-                 try: 
-                   uri = "PYRO:Stabilize@"+nodo+":8003"
-                   remote = Pyro4.Proxy(uri)
-                   remote.ping()
-                   
-                   if not node.node_control[node.node_list.index(nodo)]:
-                          join(nodo)
-                          if node.NodosEncontrados.count(nodo)!=0:
-                                node.NodosEncontrados.remove(nodo)
-                   if first_node_active!=None:
-                      first_node_active=nodo   
+    first_node_active=Node
+    for nodo in node.node_list:
+        if nodo != node.ip:
+            try: 
+                uri = "PYRO:Stabilize@"+nodo+":8003"
+                remote = Pyro4.Proxy(uri)
+                remote.ping()
                 
-                 except:
-                    if node.node_control[node.node_list.index(nodo)]==True:
-                        leave(node.node_list.index(nodo))
-                    continue
-
-            else:
+                if not node.node_control[node.node_list.index(nodo)]:
+                        join(nodo)
+                        if node.NodosEncontrados.count(nodo)!=0:
+                            node.NodosEncontrados.remove(nodo)
                 if first_node_active!=None:
-                    first_node_active=nodo 
+                    first_node_active=nodo   
+            
+            except:
+                if node.node_control[node.node_list.index(nodo)]==True:
+                    leave(node.node_list.index(nodo))
+                continue
+
+        else:
+            if first_node_active!=None:
+                first_node_active=nodo 
 
 
         for nodo in node.NodosEncontrados:
@@ -327,116 +316,116 @@ def stabilize():
         node.NodosEncontrados=[]
 
 def leave(id):
-        node.node_control[id]=False
-        ip_predecessor=get_predecessor(node.node_list[id])
-        ip_successor=get_successor(node.node_list[id])
-        update_successor(ip_predecessor,ip_successor)
-        update_predecessor(ip_successor,ip_predecessor)
-        
-        for nodo in node.node_list:
-                if nodo != node.node_list[id] and nodo != node.ip:
-                    if node.node_control[id]==True:             
-                        try:
-                            uri = "PYRO:Stabilize@"+nodo+":8005"
-                            remote = Pyro4.Proxy(uri)
-                            remote.leave_message(id)
-                        except:
-                            print("Otro nodo salio del sistema ,se vera cuando lleguemos a el")
+    node.node_control[id]=False
+    ip_predecessor=get_predecessor(node.node_list[id])
+    ip_successor=get_successor(node.node_list[id])
+    update_successor(ip_predecessor,ip_successor)
+    update_predecessor(ip_successor,ip_predecessor)
+    
+    for nodo in node.node_list:
+        if nodo != node.node_list[id] and nodo != node.ip:
+            if node.node_control[id]==True:             
+                try:
+                    uri = "PYRO:Stabilize@"+nodo+":8005"
+                    remote = Pyro4.Proxy(uri)
+                    remote.leave_message(id)
+                except:
+                    print("Otro nodo salio del sistema ,se vera cuando lleguemos a el")
 
 def join(ip):
-        SoyNuevo=True
-        if node.node_list.count(ip)==1:   #Te estas reconectando           
-            node.node_control[node.node_list.index(ip)]=True
-            SoyNuevo=False
-        else:
-            node.node_control.append(True)
-            node.node_list.append(ip)
-        sucesor=get_successor(ip)
-        predecesor=get_predecessor(ip)
-        update_successor(ip,sucesor)
-        update_predecessor(ip,predecesor)
-        update_successor(predecesor,ip)
-        update_predecessor(sucesor,ip)
-        
-        for nodo in node.node_list:            
-               if node.node_control[node.node_list.index(nodo)]:
-                    try:
-                        uri = "PYRO:Stabilize@"+nodo+":8005"
-                        remote = Pyro4.Proxy(uri)
-                        remote.join_to_system(node.node_control,node.node_list)
-                        remote.assign_boss(node.ip)
-                        remote.assign_id()
-                        #if nodo==ip:
-                           # remote.update_file_hash(list(node.files_hash.keys()),list(node.files_hash.values()))
+    SoyNuevo=True
+    if node.node_list.count(ip)==1:   #Te estas reconectando           
+        node.node_control[node.node_list.index(ip)]=True
+        SoyNuevo=False
+    else:
+        node.node_control.append(True)
+        node.node_list.append(ip)
+    sucesor=get_successor(ip)
+    predecesor=get_predecessor(ip)
+    update_successor(ip,sucesor)
+    update_predecessor(ip,predecesor)
+    update_successor(predecesor,ip)
+    update_predecessor(sucesor,ip)
+    
+    for nodo in node.node_list:            
+        if node.node_control[node.node_list.index(nodo)]:
+            try:
+                uri = "PYRO:Stabilize@"+nodo+":8005"
+                remote = Pyro4.Proxy(uri)
+                remote.join_to_system(node.node_control,node.node_list)
+                remote.assign_boss(node.ip)
+                remote.assign_id()
+                #if nodo==ip:
+                    # remote.update_file_hash(list(node.files_hash.keys()),list(node.files_hash.values()))
 
-                            #if not soyNuevo:
-                             #s.send(b"Reconectando")
-                             
+                    #if not soyNuevo:
+                        #s.send(b"Reconectando")
+                        
 
-                            #else:
-                            # s.send(b"Continue")
-                            #data=s.recv(1024)
-                            #while data != "":
-                            #    data=s.recv(1024)
-                            #    keys=json.loads(data)
-                            #    data=s.recv(1024)
-                             #   values=json.loads(data)
-                             #   for i in range(0,len(keys)-1):
-                             #      self.files_hash.setdefault(keys[i],values[i])           
-                             #   data=s.recv(1024)
-                       # else:
-                        #    s.send(b"")
+                    #else:
+                    # s.send(b"Continue")
+                    #data=s.recv(1024)
+                    #while data != "":
+                    #    data=s.recv(1024)
+                    #    keys=json.loads(data)
+                    #    data=s.recv(1024)
+                        #   values=json.loads(data)
+                        #   for i in range(0,len(keys)-1):
+                        #      self.files_hash.setdefault(keys[i],values[i])           
+                        #   data=s.recv(1024)
+                # else:
+                #    s.send(b"")
 
-                       # s.close()
-                    except:
-                        print("Otro nodo entro en el sistema ,se vera cuando lleguemos a el")
+                # s.close()
+            except:
+                print("Otro nodo entro en el sistema ,se vera cuando lleguemos a el")
 
 def get_predecessor(ip):
-        pos=node.node_list.index(ip)
+    pos=node.node_list.index(ip)
+    if pos==0:
+        pos==len(node.node_list)-1
+    else:
+        pos-=1
+    while not node.node_list[pos]:
         if pos==0:
             pos==len(node.node_list)-1
         else:
             pos-=1
-        while not node.node_list[pos]:
-            if pos==0:
-                pos==len(node.node_list)-1
-            else:
-                pos-=1
-        return node.node_list[pos]
+    return node.node_list[pos]
 
 def get_successor(self,ip):
-        pos=self.node_list.index(ip)
+    pos=self.node_list.index(ip)
+    if pos==len(self.node_list)-1:
+        pos==0
+    else:
+        pos+=1
+    while not self.node_list[pos]:
         if pos==len(self.node_list)-1:
             pos==0
         else:
             pos+=1
-        while not self.node_list[pos]:
-            if pos==len(self.node_list)-1:
-                pos==0
-            else:
-                pos+=1
-        return self.node_list[pos]
+    return self.node_list[pos]
 
 def update_successor(ip,new_successor):
-       try:
+    try:
         uri = "PYRO:Stabilize@"+ip+":8005"
         remote = Pyro4.Proxy(uri)
         remote.update_update_sucesor(new_successor)
-       except:
+    except:
         print("El nodo se desconecto del sistema")
              
 def update_predecessor(ip,new_predecessor):
-              uri = "PYRO:Stabilize@"+ip+":8005"
-              remote = Pyro4.Proxy(uri)
-              remote.update_predecesor(new_predecessor)
+    uri = "PYRO:Stabilize@"+ip+":8005"
+    remote = Pyro4.Proxy(uri)
+    remote.update_predecesor(new_predecessor)
 
 def countdown(num_of_secs):  #Temporizador que marca la revision de estabilidad del sistema
-        while num_of_secs:
-            m, s = divmod(num_of_secs, 60)
-            min_sec_format = '{:02d}:{:02d}'.format(m, s)
-            print(min_sec_format, end='/r')
-            time.sleep(1)
-            num_of_secs -= 1
+    while num_of_secs:
+        m, s = divmod(num_of_secs, 60)
+        min_sec_format = '{:02d}:{:02d}'.format(m, s)
+        print(min_sec_format, end='/r')
+        time.sleep(1)
+        num_of_secs -= 1
           
         
 
