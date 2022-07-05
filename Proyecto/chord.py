@@ -188,8 +188,7 @@ def create_finger_table():
 def run():  
     while True:
         if not node.stabilized_system:
-            if node.ip_boss == None:
-              if not node.leader_calls:
+            if node.ip_boss == None and not node.leader_calls:
                 node.search_to_boss=True
                 threading.Thread(target=get_signal, args=()).start()
                 threading.Thread(target=search_boss, args=()).start()
@@ -411,7 +410,7 @@ def update_successor(ip,new_successor):
     try:
         uri = "PYRO:Stabilize@"+ip+":8005"
         remote = Pyro4.Proxy(uri)
-        remote.update_update_sucesor(new_successor)
+        remote.update_sucesor(new_successor)
     except:
         print("El nodo se desconecto del sistema")
              
